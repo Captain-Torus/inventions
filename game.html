@@ -87,7 +87,7 @@
         <button class="btn sec" data-go="creator">🎨 Team Creator</button>
         <button class="btn sec" data-go="settings">⚙️ Settings</button>
       </div>
-      <p class="mini" style="text-align:center;margin-top:16px">Keyboard: <span class="kbd">WASD</span> move · <span class="kbd">Space</span> shoot / slide · <span class="kbd">E</span> pass · <span class="kbd">Shift</span> sprint · <span class="kbd">Q</span> switch</p>
+      <p class="mini" style="text-align:center;margin-top:16px">Keyboard: <span class="kbd">← ↑ ↓ →</span> move · <span class="kbd">Space</span> shoot / slide · <span class="kbd">E</span> pass · <span class="kbd">Shift</span> sprint · <span class="kbd">Q</span> switch</p>
     </div>
   </section>
 
@@ -144,9 +144,11 @@
       <label class="row" style="margin-top:10px"><input type="checkbox" id="setNames" checked style="width:auto;margin-right:8px"> Show player names above sprites</label>
       <label class="row"><input type="checkbox" id="setArrow" checked style="width:auto;margin-right:8px"> Show controlled-player marker</label>
       <label class="row"><input type="checkbox" id="setShake" checked style="width:auto;margin-right:8px"> Screen shake on goals</label>
+      <label>Game speed <span class="mini">(lower = slower / easier to follow)</span></label>
+      <input id="setSpeed" type="range" min="0.4" max="1" step="0.05" value="0.6" style="width:220px">
       <label>Camera zoom</label>
       <input id="setZoom" type="range" min="0.9" max="1.7" step="0.05" value="1.25" style="width:220px">
-      <p class="mini" style="margin-top:14px">Offside is not enforced in the arcade match (kept off for flow). Everything runs in this session only — no saving.</p>
+      <p class="mini" style="margin-top:14px">Move with the <b>arrow keys</b>. Your player has a yellow ring and chevron. Offside is not enforced in the arcade match (kept off for flow). Everything runs in this session only — no saving.</p>
     </div>
   </section>
 
@@ -198,7 +200,7 @@
   </div>
   <div class="poss"><div id="possA" style="height:100%;width:50%"></div><div id="possB" style="height:100%;width:50%"></div></div>
   <button class="btn sec sm btn-pause" id="pauseBtn">⏸ Pause</button>
-  <div class="keyhint">WASD move · Space shoot/slide · E pass · Shift sprint · Q switch</div>
+  <div class="keyhint">Arrow keys move · Space shoot/slide · E pass · Shift sprint · Q switch · your player = yellow ring</div>
   <div class="toast2" id="toast2"></div>
 </section>
 
@@ -404,8 +406,9 @@ class AIController{
 /* ============================ INPUT HANDLER ========================= */
 class InputHandler{
   constructor(){this.k={};this.onKey=null;
-    addEventListener('keydown',e=>{if(['w','a','s','d','q','e',' ','shift'].includes(e.key.toLowerCase())||e.key==='Shift')e.preventDefault();
-      const k=e.key.toLowerCase();if(!this.k[k]&&this.onKey)this.onKey(k);this.k[k]=true;});
+    const grab=['arrowup','arrowdown','arrowleft','arrowright','q','e',' ','shift'];
+    addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(grab.includes(k))e.preventDefault();
+      if(!this.k[k]&&this.onKey)this.onKey(k);this.k[k]=true;});
     addEventListener('keyup',e=>{this.k[e.key.toLowerCase()]=false;});
   }
   clear(){this.k={};}
@@ -489,9 +492,6 @@ class Renderer{
     const controlled = (p.team===m.userTeam && p===m.userPlayer && m.userControl);
     ctx.save();ctx.translate(p.x,p.y);
     const flip=p.vx<-6?-1:1; ctx.scale(flip,1);
-    // marker under controlled player
-    if(controlled && Game.settings.arrow){ctx.strokeStyle=c2;ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,13,15,0.15,Math.PI-0.15);ctx.stroke();
-      ctx.fillStyle=c2;ctx.beginPath();ctx.moveTo(0,-24);ctx.lineTo(-4,-31);ctx.lineTo(4,-31);ctx.fill();}
     const diving=p.dive>0;
     if(diving){ctx.rotate((flip>0?1:-1)*1.1);}
     // legs (with socks + cleats)
@@ -519,10 +519,20 @@ class Renderer{
     ctx.fillStyle='#f0c79a';ctx.beginPath();ctx.arc(0,-15,5,0,7);ctx.fill();
     ctx.fillStyle='#3a2a1a';ctx.beginPath();ctx.arc(0,-16.5,5,Math.PI,7);ctx.fill();
     ctx.restore();
+    // bright ring + bobbing chevron marking YOUR player (drawn in world space)
+    if(controlled && Game.settings.arrow){
+      const pulse=1+Math.sin(p.animT*0.4+ (p.number))*0.06;
+      ctx.strokeStyle='#ffe14d';ctx.lineWidth=2.6;
+      ctx.beginPath();ctx.ellipse(p.x,p.y+12,16*pulse,7.5*pulse,0,0,7);ctx.stroke();
+      ctx.strokeStyle='rgba(0,0,0,.35)';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(p.x,p.y+12,16*pulse,7.5*pulse,0,0,7);ctx.stroke();
+      const by=p.y-42-Math.sin(p.animT*0.5)*2;
+      ctx.fillStyle='#ffe14d';ctx.strokeStyle='rgba(0,0,0,.4)';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(p.x,by+9);ctx.lineTo(p.x-6,by);ctx.lineTo(p.x+6,by);ctx.closePath();ctx.fill();ctx.stroke();
+    }
     // name tag
     if(Game.settings.names){ctx.fillStyle='rgba(0,0,0,.45)';ctx.font='7px Arial';ctx.textAlign='center';
       const w=ctx.measureText(p.name).width+6;ctx.fillRect(p.x-w/2,p.y-34,w,9);
-      ctx.fillStyle=controlled?c2:'#dfe';ctx.fillText(p.name,p.x,p.y-27);}
+      ctx.fillStyle=controlled?'#ffe14d':'#dfe';ctx.fillText(p.name,p.x,p.y-27);}
   }
 }
 
@@ -559,7 +569,6 @@ class Match{
   setPossession(t){this.possTeam=t;}
   kickoff(scoringTeamJustConceded){
     // reset to formation, give ball to a midfielder at center
-    for(const p of this.players){const t=p.team;const i=this.players.indexOf(p);}
     this.players.forEach(p=>{const idx=this.teams[p.team].live.indexOf(p);const f=FORMATION[idx];
       const fx=p.team===0?f[0]:1-f[0];p.x=F.L+fx*(F.R-F.L);p.y=F.T+f[1]*(F.B-F.T);p.vx=p.vy=0;});
     this.ball.reset(F.CX,F.CY);
@@ -570,28 +579,55 @@ class Match{
   }
   update(dt,input){
     if(this.paused||this.over)return;
-    this.time+=dt;
-    if(this.restart>0){this.restart-=dt; this.physics(dt); return;}
-    // user control
-    if(this.userControl && this.userPlayer) this.userInput(input,dt);
+    this.time+=dt;                                  // match clock runs in real time
+    const g=dt*(Game.gameSpeed||0.6);               // gameplay runs in slow-motion
+    if(this.restart>0){this.restart-=dt; this.physics(g); return;}
+    // always control the player in possession (or nearest to the ball when defending)
+    if(this.userControl) this.autoSelect();
+    if(this.userControl && this.userPlayer) this.userInput(input,g);
     // AI for everyone else
     for(const p of this.players){
-      if(p.dive>0){p.dive-=dt;}
-      if(p.slide>0){p.slide-=dt;}
-      if(p.cooldown>0)p.cooldown-=dt;
+      if(p.dive>0){p.dive-=g;}
+      if(p.slide>0){p.slide-=g;}
+      if(p.cooldown>0)p.cooldown-=g;
       p.staminaMul = 1; // recompute below when sprinting
       if(p===this.userPlayer && this.userControl) continue;
-      this.ai.think(p,dt);
+      this.ai.think(p,g);
     }
-    this.physics(dt);
-    // possession accounting
+    this.physics(g);
     this.possFrames[this.possTeam]++;
-    // timer / halves / end
+    this.watchStuck(dt);
     if(this.time>=this.duration){this.endMatch();}
+  }
+  // pick the controlled player: whoever has the ball on your team, else nearest to the ball
+  autoSelect(){
+    const b=this.ball;
+    if(b.owner && b.owner.team===this.userTeam && b.owner.role!=='GK'){this.userPlayer=b.owner;return;}
+    const n=this.nearestTo(this.userTeam,b); if(n)this.userPlayer=n;
+  }
+  // anti-stall: if the ball barely moves for ~3s, free it to the nearest player
+  watchStuck(dt){
+    if(this.restart>0){this.stuckTimer=0;return;}
+    this.stuckTimer=(this.stuckTimer||0)+dt;
+    if(this.stuckTimer>=1){
+      const lx=this._lbx==null?this.ball.x:this._lbx, ly=this._lby==null?this.ball.y:this._lby;
+      const moved=dist(this.ball.x,this.ball.y,lx,ly);
+      this.stuckCount = moved<60 ? (this.stuckCount||0)+1 : 0;
+      this._lbx=this.ball.x;this._lby=this.ball.y;this.stuckTimer=0;
+      if(this.stuckCount>=3){this.unstick();this.stuckCount=0;}
+    }
+  }
+  unstick(){
+    const b=this.ball;
+    const near=this.players.reduce((a,p)=>dist(p.x,p.y,b.x,b.y)<dist(a.x,a.y,b.x,b.y)?p:a,this.players[0]);
+    b.vx=b.vy=0; b.owner = near.role==='GK'?null:near;
+    if(b.owner)this.setPossession(near.team);
+    for(const q of this.players){if(q!==near && dist(q.x,q.y,b.x,b.y)<75)q.cooldown=Math.max(q.cooldown,1.1);}
+    this.showToast('Loose ball!',700);
   }
   userInput(input,dt){
     const p=this.userPlayer,k=input.k;
-    let mx=0,my=0; if(k['w'])my--; if(k['s'])my++; if(k['a'])mx--; if(k['d'])mx++;
+    let mx=0,my=0; if(k['arrowup'])my--; if(k['arrowdown'])my++; if(k['arrowleft'])mx--; if(k['arrowright'])mx++;
     const sprint=k['shift']&&p.stamina>0.05;
     if(sprint){p.stamina=Math.max(0,p.stamina-dt*0.25);} else {p.stamina=Math.min(1,p.stamina+dt*0.12);}
     p.staminaMul = sprint?1.42:1;
@@ -852,7 +888,7 @@ class Tournament{
 
 /* =============================== GAME ============================== */
 const Game={
-  teams:[], tournament:null, match:null, raf:null, last:0, zoom:1.25,
+  teams:[], tournament:null, match:null, raf:null, last:0, zoom:1.25, gameSpeed:0.6,
   settings:{names:true,arrow:true,shake:true},
   renderer:null, input:null,
   init(){
@@ -1053,6 +1089,7 @@ const Game={
     $('#setArrow').onchange=e=>this.settings.arrow=e.target.checked;
     $('#setShake').onchange=e=>this.settings.shake=e.target.checked;
     $('#setZoom').oninput=e=>this.zoom=+e.target.value;
+    $('#setSpeed').oninput=e=>this.gameSpeed=+e.target.value;
   },
   togglePause(){ if(!this.match||this.match.over)return; this.match.paused=!this.match.paused;
     if(this.match.paused)this.showPause(); else this.removeOverlay(); },
