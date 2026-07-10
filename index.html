@@ -88,10 +88,10 @@
   .statline{display:grid;grid-template-columns:60px 1fr 60px;align-items:center;gap:10px;margin:8px 0}
   .statline .lab{grid-column:1/-1;text-align:center;font-size:.78rem;color:var(--muted);margin-bottom:-4px}
   /* bracket */
-  .bracket{display:flex;gap:26px;overflow-x:auto;padding:10px 4px}
-  .round{display:flex;flex-direction:column;justify-content:space-around;gap:16px;min-width:190px}
+  .bracket{display:flex;gap:52px;overflow-x:auto;padding:10px 4px;position:relative}
+  .round{display:flex;flex-direction:column;justify-content:space-around;gap:16px;min-width:190px;position:relative;z-index:1}
   .round h4{text-align:center;color:var(--muted);font-size:.8rem;text-transform:uppercase}
-  .tie{background:var(--panel2);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .tie{background:var(--panel2);border:1px solid var(--line);border-radius:10px;overflow:hidden;position:relative;z-index:1}
   .tie .side{display:flex;justify-content:space-between;padding:8px 10px;font-size:.86rem;gap:8px}
   .tie .side.win{background:rgba(56,224,123,.12);font-weight:700}
   .tie .side+.side{border-top:1px solid var(--line)}
@@ -631,13 +631,14 @@ class TournamentEngine{
     this.id=uid();
     this.name=opt.name||'World Cup';
     this.teams=teams;                       // array of Team
-    this.opt={extraTime:true,penalties:true,thirdPlace:true,...opt};
+    this.opt={extraTime:true,penalties:true,thirdPlace:true,format:'groups',...opt};
     this.groups=[];                         // [{name,teams:[],table:{},matches:[]}]
     this.knockout={R16:[],QF:[],SF:[],third:null,final:null};
     this.stage='group';                     // group|R16|QF|SF|final|done
     this.champion=null;
     this.stats=new StatisticsEngine();
-    this._buildGroups();
+    if(this.opt.format==='knockout') this._buildKnockoutOnly();
+    else this._buildGroups();
   }
   _buildGroups(){
     const t=[...this.teams];
@@ -677,18 +678,22 @@ class TournamentEngine{
       y.Pts-x.Pts || (y.GF-y.GA)-(x.GF-x.GA) || y.GF-x.GF || (Math.random()-.5));
   }
   _seedKnockout(){
-    // take top 2 of each group
+    // take top 2 of each group, then seed the bracket
     const qualifiers=[];
     this.groups.forEach(g=>{const s=this.standings(g);qualifiers.push(s[0].team,s[1]?s[1].team:s[0].team);});
-    // if not enough teams for R16, collapse rounds
+    this._seedFromList(qualifiers);
+  }
+  // knockout-only tournament: put every chosen team straight into a bracket
+  _buildKnockoutOnly(){this.groups=[];this._seedFromList(this.teams.slice());}
+  // build the first knockout round from an ordered list of teams
+  _seedFromList(list){
     const pairs=[];
-    for(let i=0;i<qualifiers.length;i+=2)
-      pairs.push({a:qualifiers[i],b:qualifiers[i+1]||qualifiers[0],played:false,report:null});
-    // choose starting knockout round based on count
+    for(let i=0;i<list.length;i+=2)
+      pairs.push({a:list[i],b:list[i+1]||list[0],played:false,report:null});
     if(pairs.length>=8){this.knockout.R16=pairs.slice(0,8);this.stage='R16';}
     else if(pairs.length>=4){this.knockout.QF=pairs.slice(0,4);this.stage='QF';}
     else if(pairs.length>=2){this.knockout.SF=pairs.slice(0,2);this.stage='SF';}
-    else {this.knockout.final={a:qualifiers[0],b:qualifiers[1]||qualifiers[0]};this.stage='final';}
+    else {this.knockout.final={a:list[0],b:list[1]||list[0],played:false,report:null};this.stage='final';}
   }
   _playTie(mt){
     const rep=MatchEngine.simulate(mt.a,mt.b,{knockout:true,extraTime:this.opt.extraTime,penalties:true,neutral:true});
@@ -881,6 +886,8 @@ const UI={
     $('#nav').innerHTML=tabs.map(([id,l])=>`<button data-tab="${id}">${l}</button>`).join('');
     $$('#nav button').forEach(b=>b.onclick=()=>this.go(b.dataset.tab));
     this.go('teams');
+    // keep bracket connector lines aligned on resize
+    window.addEventListener('resize',()=>{if(this.tab==='tournament')this.drawBracketLines();});
     // auto-load previous session if present
     if(localStorage.getItem(SaveManager.KEY)) SaveManager.load();
   },
@@ -1229,6 +1236,10 @@ const UI={
     v.innerHTML=`<div class="card">
       <h2>🏆 Create Tournament</h2>
       <p class="mini">Pick participating teams (multiples of 4 recommended for full groups).</p>
+      <div class="row" style="margin-bottom:8px">
+        <label class="chk"><input type="radio" name="fmt" value="groups" checked> Group stage + knockouts</label>
+        <label class="chk"><input type="radio" name="fmt" value="knockout"> Knockout bracket only <span class="mini">(drag teams to set matchups)</span></label>
+      </div>
       <div class="row"><button class="btn sec" id="selAll">Select all</button>
         <button class="btn sec" id="selNone">Clear</button>
         <label class="chk"><input type="checkbox" id="tET" checked> Extra time</label>
@@ -1253,7 +1264,9 @@ const UI={
       const ids=$$('.tpick').filter(c=>c.checked).map(c=>c.value);
       if(ids.length<4){toast('Select at least 4 teams');return;}
       const teams=ids.map(id=>DB.teams.find(t=>t.id===id));
-      DB.tournament=new TournamentEngine(teams,{extraTime:$('#tET').checked,penalties:$('#tPen').checked,thirdPlace:$('#t3rd').checked});
+      const fmt=($('input[name=fmt]:checked')||{}).value||'groups';
+      DB.tournament=new TournamentEngine(teams,{extraTime:$('#tET').checked,penalties:$('#tPen').checked,
+        thirdPlace:$('#t3rd').checked,format:fmt});
       toast('🏁 Tournament created');this.renderTournament();
     };
   },
@@ -1303,9 +1316,10 @@ const UI={
       ${ko.third?`<h4 style="margin-top:14px">3rd place</h4>${this.tieView(ko.third,'third|0')}`:''}</div>`;
     if(!html){box.innerHTML='';return;}
     box.innerHTML=`<div class="card"><h3>🗺 Knockout bracket</h3>
-      <p class="mini">Drag a team box onto another (in unplayed ties) to re-seed the bracket before you play the round.</p>
+      <p class="mini">Drag any team box onto another (in unplayed ties) to choose who plays who.</p>
       <div class="bracket">${html}</div></div>`;
     this.wireBracketDrag();
+    requestAnimationFrame(()=>this.drawBracketLines());
   },
   tieView(m,loc){
     if(!m)return'';
@@ -1321,7 +1335,33 @@ const UI={
         ${t?`<span class="bov">${t.overall}</span>`:''}</div>`;
     const side=(t,sc,win,idx)=>`<div class="side ${win?'win':''}">
       ${box(t,idx)}<span style="padding-left:6px">${sc!==null?sc:''}${win&&so?` (${so[idx]})`:''}</span></div>`;
-    return `<div class="tie">${side(m.a,s[0],winA,0)}${side(m.b,s[1],winB,1)}</div>`;
+    return `<div class="tie" data-node="${loc}">${side(m.a,s[0],winA,0)}${side(m.b,s[1],winB,1)}</div>`;
+  },
+  // draw orthogonal connector lines between each tie and its next-round tie
+  drawBracketLines(){
+    const wrap=$('#bracketBox .bracket'); if(!wrap) return;
+    let svg=wrap.querySelector('#brLines');
+    if(!svg){svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.id='brLines';
+      Object.assign(svg.style,{position:'absolute',left:'0',top:'0',pointerEvents:'none',zIndex:'0',overflow:'visible'});
+      wrap.prepend(svg);}
+    const order=['R16','QF','SF','final'];
+    const wr=wrap.getBoundingClientRect();
+    const ox=wr.left-wrap.scrollLeft, oy=wr.top-wrap.scrollTop;
+    const paths=[];
+    for(let ri=0;ri<order.length-1;ri++){
+      const cur=order[ri],nxt=order[ri+1];
+      wrap.querySelectorAll(`.tie[data-node^="${cur}|"]`).forEach(node=>{
+        const idx=+node.dataset.node.split('|')[1];
+        const target=wrap.querySelector(`.tie[data-node="${nxt}|${Math.floor(idx/2)}"]`);
+        if(!target)return;
+        const a=node.getBoundingClientRect(),b=target.getBoundingClientRect();
+        const x1=a.right-ox,y1=a.top+a.height/2-oy,x2=b.left-ox,y2=b.top+b.height/2-oy,mx=(x1+x2)/2;
+        paths.push(`M${x1} ${y1} H${mx} V${y2} H${x2}`);
+      });
+    }
+    svg.setAttribute('width',wrap.scrollWidth);svg.setAttribute('height',wrap.scrollHeight);
+    svg.style.width=wrap.scrollWidth+'px';svg.style.height=wrap.scrollHeight+'px';
+    svg.innerHTML=paths.map(d=>`<path d="${d}" fill="none" stroke="#3a4d78" stroke-width="2"/>`).join('');
   },
   // resolve a "round|idx|side" location to its tie object + side key
   bracketSlot(loc){
