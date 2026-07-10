@@ -1,4 +1,26 @@
-# ⚽ World Cup Simulator
+# ⚽ Football Project
+
+Two self-contained apps, each a **single HTML file** — no frameworks, no build step, no server.
+
+- **`index.html`** — the World Cup **Simulator** (create teams, simulate matches & tournaments, stats, save/load). Details below.
+- **`game.html`** — a playable **2D arcade soccer game** with real-time controls, AI, ball physics, hand-drawn player sprites, and its own tournament mode. Open it and pick *Play Match* or *Tournament Mode*.
+
+### 🎮 game.html — the playable game
+Open in a browser and use the keyboard:
+
+| Key | Action |
+|-----|--------|
+| `W A S D` | Move |
+| `Space` | Shoot (hold to power up) / slide tackle when defending |
+| `E` | Pass |
+| `Shift` | Sprint |
+| `Q` | Switch player |
+
+Modes: **Play Match** (pick teams, 3/5/10-min games, difficulty, or watch AI vs AI), **Team Creator** (name, colours, ratings, signature stats), **Tournament Mode** (4/8/16/32 teams — build & drag your own bracket, then Play / Simulate / Watch each tie). Canvas rendering targets ~60 FPS; runs only in the current session (no saving, by design). Offside is intentionally not enforced in the arcade match for smoother flow.
+
+---
+
+# ⚽ World Cup Simulator (`index.html`)
 
 An interactive FIFA-style World Cup simulator in a **single HTML file** — no frameworks, no build step, no server. Just open `index.html` in any browser.
 

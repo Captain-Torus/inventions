@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>⚽ Retro Soccer — Playable Game + Tournament</title>
+<style>
+  :root{--bg:#0a1018;--panel:#121c2b;--panel2:#1a2740;--line:#2a3a58;--text:#e8eef8;
+    --muted:#93a3c2;--accent:#39e07b;--accent2:#2dd4bf;--gold:#f5c542;--red:#f4676b;}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;font-family:'Segoe UI',system-ui,Arial,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+  h1,h2,h3{margin:0 0 .5rem}
+  button{font-family:inherit}
+  .btn{background:var(--accent);color:#05230f;border:none;padding:11px 18px;border-radius:10px;font-weight:800;cursor:pointer;font-size:.95rem;transition:.12s}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.sec{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+  .btn.sm{padding:6px 11px;font-size:.82rem}
+  .btn.danger{background:#3a1620;color:var(--red);border:1px solid #5b2430}
+  input,select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.9rem}
+  label{font-size:.75rem;color:var(--muted);display:block;margin:8px 0 3px}
+  .wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:18px}
+  .screen{display:none;width:100%;max-width:920px;max-height:100%;overflow:auto}
+  .screen.active{display:block;animation:fade .25s}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+  .title{font-size:2.4rem;font-weight:900;letter-spacing:1px;text-align:center;margin-bottom:4px}
+  .title .b{color:var(--accent)}
+  .sub{text-align:center;color:var(--muted);margin-bottom:22px}
+  .menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .menu-grid .btn{padding:22px;font-size:1.15rem;border-radius:14px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  @media(max-width:640px){.grid2,.grid3,.menu-grid{grid-template-columns:1fr}}
+  .muted{color:var(--muted)} .mini{font-size:.78rem;color:var(--muted)}
+  .teamchip{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+  .swatch{width:20px;height:20px;border-radius:5px;border:1px solid rgba(255,255,255,.25)}
+  table{width:100%;border-collapse:collapse;font-size:.85rem}
+  th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
+  th{color:var(--muted);font-size:.72rem;text-transform:uppercase}
+  /* ---- game canvas + HUD ---- */
+  #gameScreen{display:none;position:absolute;inset:0;background:#0a1018}
+  #gameScreen.active{display:block}
+  #cv{display:block;width:100%;height:100%;image-rendering:optimizeQuality}
+  .hud{position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:14px;
+    background:rgba(10,16,24,.82);border:1px solid var(--line);border-radius:12px;padding:8px 16px;z-index:5;backdrop-filter:blur(6px)}
+  .hud .sc{font-size:1.5rem;font-weight:900;letter-spacing:2px}
+  .hud .nm{font-weight:800}
+  .hud .clock{font-variant-numeric:tabular-nums;font-weight:800;color:var(--gold);min-width:70px;text-align:center}
+  .hud .half{font-size:.7rem;color:var(--muted)}
+  .poss{position:absolute;top:64px;left:50%;transform:translateX(-50%);width:280px;height:8px;border-radius:6px;overflow:hidden;background:var(--panel2);border:1px solid var(--line);display:flex;z-index:5}
+  .toast2{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:2.4rem;font-weight:900;
+    color:#fff;text-shadow:0 3px 16px #000;z-index:6;pointer-events:none;opacity:0;transition:.2s}
+  .toast2.show{opacity:1;transform:translate(-50%,-60%) scale(1.05)}
+  .btn-pause{position:absolute;top:12px;right:12px;z-index:5}
+  .keyhint{position:absolute;bottom:10px;left:12px;z-index:5;font-size:.72rem;color:var(--muted);background:rgba(10,16,24,.7);padding:6px 10px;border-radius:8px;border:1px solid var(--line)}
+  .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(6,10,16,.86);z-index:10}
+  .overlay .card{max-width:520px;width:92%}
+  .kbd{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:1px 7px;font-weight:700;font-size:.8rem}
+  /* bracket */
+  .bracket{display:flex;gap:46px;overflow:auto;padding:10px 4px;position:relative}
+  .round{display:flex;flex-direction:column;justify-content:space-around;gap:14px;min-width:210px;position:relative;z-index:1}
+  .round h4{text-align:center;color:var(--muted);font-size:.75rem;text-transform:uppercase}
+  .tie{background:var(--panel2);border:1px solid var(--line);border-radius:10px;position:relative;z-index:1}
+  .tie .side{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:7px 9px;font-size:.85rem}
+  .tie .side+.side{border-top:1px solid var(--line)}
+  .tie .side.win{background:rgba(57,224,123,.14);font-weight:800}
+  .tteam{display:flex;align-items:center;gap:7px;flex:1;min-width:0}
+  .tteam .swatch{width:14px;height:14px}
+  .tteam .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tteam[draggable=true]{cursor:grab}
+  .tteam.dragover{outline:2px dashed var(--accent);outline-offset:2px;border-radius:6px}
+  .tie .acts{display:flex;gap:5px;justify-content:center;padding:6px;border-top:1px dashed var(--line)}
+  .pill{display:inline-flex;gap:6px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:4px 11px;font-size:.8rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- ============ MAIN MENU ============ -->
+  <section id="menuScreen" class="screen active">
+    <div class="card">
+      <div class="title">⚽ RETRO <span class="b">SOCCER</span></div>
+      <div class="sub">A playable 2D arcade football game + tournament mode</div>
+      <div class="menu-grid">
+        <button class="btn" data-go="playSetup">▶️ Play Match</button>
+        <button class="btn" data-go="tourSetup">🏆 Tournament Mode</button>
+        <button class="btn sec" data-go="creator">🎨 Team Creator</button>
+        <button class="btn sec" data-go="settings">⚙️ Settings</button>
+      </div>
+      <p class="mini" style="text-align:center;margin-top:16px">Keyboard: <span class="kbd">WASD</span> move · <span class="kbd">Space</span> shoot / slide · <span class="kbd">E</span> pass · <span class="kbd">Shift</span> sprint · <span class="kbd">Q</span> switch</p>
+    </div>
+  </section>
+
+  <!-- ============ PLAY SETUP ============ -->
+  <section id="playSetupScreen" class="screen">
+    <div class="card">
+      <h2>▶️ Play Match</h2>
+      <div class="grid2">
+        <div><label>Your team</label><select id="psTeamA"></select></div>
+        <div><label>Opponent</label><select id="psTeamB"></select></div>
+      </div>
+      <div class="grid3" style="margin-top:6px">
+        <div><label>Match length</label><select id="psLen"><option value="3">3 minutes</option><option value="5" selected>5 minutes</option><option value="10">10 minutes</option></select></div>
+        <div><label>Difficulty</label><select id="psDiff"><option value="0.8">Easy</option><option value="1" selected>Normal</option><option value="1.2">Hard</option></select></div>
+        <div><label>You control</label><select id="psControl"><option value="1" selected>Team A (you)</option><option value="0">Watch AI vs AI</option></select></div>
+      </div>
+      <div class="row" style="margin-top:18px">
+        <button class="btn" id="psStart">⚽ Kick Off</button>
+        <button class="btn sec" data-go="menu">← Back</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TEAM CREATOR ============ -->
+  <section id="creatorScreen" class="screen">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <h2>🎨 Team Creator</h2>
+        <button class="btn sec sm" data-go="menu">← Back</button>
+      </div>
+      <div class="grid3">
+        <div><label>Team name</label><input id="ccName" placeholder="e.g. Falcons"></div>
+        <div><label>Primary color</label><input id="ccC1" type="color" value="#2f7bff"></div>
+        <div><label>Secondary color</label><input id="ccC2" type="color" value="#ffffff"></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div><label>Base skill</label><input id="ccSkill" type="number" min="40" max="95" value="78" style="width:90px"></div>
+        <button class="btn sm" id="ccGen">🎲 Auto-generate squad</button>
+        <button class="btn sm" id="ccAdd">➕ Add player</button>
+      </div>
+      <div id="ccList" style="margin-top:12px"></div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn" id="ccSave">💾 Save team</button>
+      </div>
+      <h3 style="margin-top:20px">Teams (<span id="ccCount"></span>)</h3>
+      <div id="ccTeams" class="grid3"></div>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section id="settingsScreen" class="screen">
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><h2>⚙️ Settings</h2><button class="btn sec sm" data-go="menu">← Back</button></div>
+      <label class="row" style="margin-top:10px"><input type="checkbox" id="setNames" checked style="width:auto;margin-right:8px"> Show player names above sprites</label>
+      <label class="row"><input type="checkbox" id="setArrow" checked style="width:auto;margin-right:8px"> Show controlled-player marker</label>
+      <label class="row"><input type="checkbox" id="setShake" checked style="width:auto;margin-right:8px"> Screen shake on goals</label>
+      <label>Camera zoom</label>
+      <input id="setZoom" type="range" min="0.9" max="1.7" step="0.05" value="1.25" style="width:220px">
+      <p class="mini" style="margin-top:14px">Offside is not enforced in the arcade match (kept off for flow). Everything runs in this session only — no saving.</p>
+    </div>
+  </section>
+
+  <!-- ============ TOURNAMENT SETUP ============ -->
+  <section id="tourSetupScreen" class="screen">
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><h2>🏆 Tournament Setup</h2><button class="btn sec sm" data-go="menu">← Back</button></div>
+      <div class="grid3">
+        <div><label>Number of teams</label><select id="tsSize"><option>4</option><option selected>8</option><option>16</option><option>32</option></select></div>
+        <div><label>Third-place match</label><select id="ts3rd"><option value="1" selected>Yes</option><option value="0">No</option></select></div>
+        <div><label>Match length (live)</label><select id="tsLen"><option value="3" selected>3 min</option><option value="5">5 min</option><option value="10">10 min</option></select></div>
+      </div>
+      <p class="mini" style="margin-top:10px">Pick a team for each slot, then drag slots to rearrange matchups. Add your own teams in the Team Creator first.</p>
+      <div id="tsSlots" class="grid2" style="margin-top:8px"></div>
+      <div class="row" style="margin-top:16px">
+        <button class="btn sec sm" id="tsRandom">🎲 Randomize</button>
+        <button class="btn" id="tsBuild">🏁 Build bracket</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TOURNAMENT BRACKET ============ -->
+  <section id="tourScreen" class="screen" style="max-width:100%">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <h2>🏆 Tournament <span class="mini" id="tourStage"></span></h2>
+        <div class="row">
+          <button class="btn sm" id="tourSimRound">⏩ Simulate round</button>
+          <button class="btn sec sm" data-go="tourSetup">🗑 New</button>
+          <button class="btn sec sm" data-go="menu">Menu</button>
+        </div>
+      </div>
+      <div id="tourChampion"></div>
+      <div id="tourStats" class="grid3" style="margin-top:10px"></div>
+      <div id="bracketBox" style="margin-top:12px"></div>
+    </div>
+  </section>
+</div>
+
+<!-- ============ LIVE MATCH ============ -->
+<section id="gameScreen">
+  <canvas id="cv"></canvas>
+  <div class="hud">
+    <span class="nm" id="hudA">A</span>
+    <span class="sc" id="hudScore">0 - 0</span>
+    <span class="nm" id="hudB">B</span>
+    <span style="width:1px;height:22px;background:var(--line)"></span>
+    <div><div class="clock" id="hudClock">0:00</div><div class="half" id="hudHalf">1st half</div></div>
+  </div>
+  <div class="poss"><div id="possA" style="height:100%;width:50%"></div><div id="possB" style="height:100%;width:50%"></div></div>
+  <button class="btn sec sm btn-pause" id="pauseBtn">⏸ Pause</button>
+  <div class="keyhint">WASD move · Space shoot/slide · E pass · Shift sprint · Q switch</div>
+  <div class="toast2" id="toast2"></div>
+</section>
+
+<script>
+/* ==========================================================================
+   RETRO SOCCER — playable 2D arcade game + tournament simulator (single file)
+   Classes: Player, Ball, Team, Match, AIController, PhysicsEngine,
+            Renderer, InputHandler, Tournament, Bracket, UIManager, Game
+   ========================================================================== */
+const $=(s,e=document)=>e.querySelector(s), $$=(s,e=document)=>[...e.querySelectorAll(s)];
+const rnd=(a,b)=>Math.random()*(b-a)+a, irnd=(a,b)=>Math.floor(rnd(a,b+1));
+const clamp=(v,a,b)=>v<a?a:v>b?b:v, lerp=(a,b,t)=>a+(b-a)*t, pick=a=>a[Math.floor(Math.random()*a.length)];
+const dist=(ax,ay,bx,by)=>Math.hypot(ax-bx,ay-by), uid=()=>Math.random().toString(36).slice(2,8);
+
+/* ---- field geometry (world units) ---- */
+const F={W:1120,H:720,IN:70};             // inset margin -> playing area
+F.L=F.IN; F.R=F.W-F.IN; F.T=F.IN; F.B=F.H-F.IN;
+F.CX=F.W/2; F.CY=F.H/2;
+F.GOAL_H=170; F.GY1=F.CY-F.GOAL_H/2; F.GY2=F.CY+F.GOAL_H/2; F.GOAL_D=30;
+F.BOX_W=150; F.BOX_H=330; F.SIX_W=60; F.SIX_H=180;
+
+const SIG_STATS=['Pace','Shooting','Passing','Dribbling','Defending','Tackling','Strength','Vision','Finishing','Heading','Goalkeeping','Free Kicks','Penalties','Crossing','Stamina'];
+
+/* =============================== PLAYER =============================== */
+class Player{
+  constructor(o){
+    this.name=o.name; this.role=o.role;           // GK/DEF/MID/FWD
+    this.overall=clamp(o.overall,1,100);
+    this.signature=o.signature;
+    this.number=o.number||1;
+    this.stats=o.stats||Player.roll(this.overall,this.role,this.signature);
+    // live match state
+    this.x=0;this.y=0;this.vx=0;this.vy=0; this.homeX=0;this.homeY=0;
+    this.team=0; this.anim='idle'; this.animT=0; this.faceLeft=false;
+    this.stamina=1; this.cooldown=0; this.slide=0; this.cardY=0; this.cardR=0; this.dive=0;
+  }
+  static roll(ov,role,sig){
+    const bias={GK:{Goalkeeping:16,Strength:5,Finishing:-16,Pace:-6},
+      DEF:{Defending:12,Tackling:12,Heading:8,Strength:8,Finishing:-8},
+      MID:{Passing:12,Vision:10,Dribbling:7,Stamina:8,Goalkeeping:-25},
+      FWD:{Finishing:12,Shooting:12,Pace:8,Dribbling:8,Goalkeeping:-25}}[role]||{};
+    const s={};
+    for(const k of SIG_STATS) s[k]=clamp(Math.round(ov+(bias[k]||0)+rnd(-12,9)),20,99);
+    if(sig) s[sig]=100;
+    return s;
+  }
+  spd(){return this.stats['Pace'];}          // movement speed source
+  get(k){return this.stats[k]||55;}
+}
+
+/* ================================ TEAM =============================== */
+class Team{
+  constructor(o){
+    this.id=o.id||uid(); this.name=o.name;
+    this.c1=o.c1||'#2f7bff'; this.c2=o.c2||'#ffffff';
+    this.players=(o.players||[]).map(p=>p instanceof Player?p:new Player(p));
+  }
+  get overall(){return this.players.length?Math.round(this.players.reduce((s,p)=>s+p.overall,0)/this.players.length):60;}
+  clonePlayers(){return this.players.map(p=>new Player({name:p.name,role:p.role,overall:p.overall,signature:p.signature,number:p.number,stats:{...p.stats}}));}
+}
+// formation home positions (fraction of field) for a side attacking +x
+const FORMATION=[
+  [0.06,0.50,'GK'],
+  [0.20,0.20,'DEF'],[0.20,0.40,'DEF'],[0.20,0.60,'DEF'],[0.20,0.80,'DEF'],
+  [0.40,0.30,'MID'],[0.42,0.50,'MID'],[0.40,0.70,'MID'],
+  [0.62,0.25,'FWD'],[0.66,0.50,'FWD'],[0.62,0.75,'FWD']
+];
+function makeSquad(base,names){
+  const players=[];
+  FORMATION.forEach((f,i)=>{
+    const role=f[2]; const ov=clamp(base+irnd(-7,6),40,96);
+    let sig; if(role==='GK')sig='Goalkeeping';
+      else sig=pick({DEF:['Defending','Tackling','Strength','Heading'],MID:['Passing','Vision','Dribbling','Stamina'],FWD:['Finishing','Shooting','Pace','Dribbling']}[role]);
+    players.push(new Player({name:names?names[i]:('P'+(i+1)),role,overall:ov,signature:sig,number:i===0?1:i+1}));
+  });
+  return players;
+}
+/* preset nations with colors */
+const PRESETS=[
+  ['Brazil','#f5d90a','#1b9e46',86],['France','#2b3a8c','#ffffff',86],['Argentina','#5aa9e6','#ffffff',85],
+  ['England','#ffffff','#c8102e',85],['Spain','#c60b1e','#f5d90a',84],['Germany','#111111','#f5d90a',83],
+  ['Portugal','#c8102e','#0a5c36',84],['Netherlands','#ff6a00','#ffffff',83],['Italy','#1b4fa0','#ffffff',82],
+  ['Belgium','#e30613','#f5d90a',82],['Croatia','#c8102e','#ffffff',80],['Uruguay','#5aa9e6','#111111',80],
+  ['Japan','#0b3ea8','#ffffff',79],['Morocco','#0a5c36','#c8102e',80],['USA','#1b2a6b','#ffffff',78],['Mexico','#0a6b3a','#e30613',78]
+];
+const NAMEBANK=['Silva','Rossi','Kane','Diaz','Muller','Costa','Sane','Vidal','Mensah','Nowak','Suzuki','Traore','Popov','Berg','Moreau','Dahl','Okafor','Ferrari','Haddad','Ivanov','Reyes','Blanc'];
+function presetTeams(n){
+  return PRESETS.slice(0,n).map(([name,c1,c2,ov])=>{
+    const names=Array.from({length:11},()=>pick(NAMEBANK));
+    return new Team({name,c1,c2,players:makeSquad(ov,names)});
+  });
+}
+
+/* ============================== PHYSICS ============================== */
+const PhysicsEngine={
+  // advance ball with friction & wall/post collisions; returns event string or null
+  stepBall(ball,dt){
+    if(ball.owner) return null;
+    ball.x+=ball.vx*dt; ball.y+=ball.vy*dt;
+    const fr=Math.pow(0.13,dt);            // ground friction
+    ball.vx*=fr; ball.vy*=fr;
+    ball.spin=(ball.spin||0)+ (ball.vx)*dt*0.05;
+    if(Math.abs(ball.vx)<3&&Math.abs(ball.vy)<3){ball.vx=0;ball.vy=0;}
+    return null;
+  }
+};
+
+/* ================================ BALL =============================== */
+class Ball{constructor(){this.reset(F.CX,F.CY);}
+  reset(x,y){this.x=x;this.y=y;this.vx=0;this.vy=0;this.owner=null;this.spin=0;}
+  speed(){return Math.hypot(this.vx,this.vy);}
+}
+
+/* ============================ AI CONTROLLER ========================== */
+class AIController{
+  constructor(match){this.m=match;}
+  // compute a steering target for a non-user player
+  think(p,dt){
+    const m=this.m, b=m.ball, dir=p.team===0?1:-1;      // attack direction
+    const oppGoalX=p.team===0?F.R:F.L;
+    const ownGoalX=p.team===0?F.L:F.R;
+    const carrier=b.owner;
+    const attacking = carrier && carrier.team===p.team;
+    // GOALKEEPER
+    if(p.role==='GK'){
+      const gy=clamp(b.y, F.GY1+6, F.GY2-6);
+      let gx=ownGoalX+dir*(28+ (Math.abs(b.x-ownGoalX)<F.BOX_W?0:6));
+      // rush if ball loose in the box
+      const inBox=(p.team===0? b.x<F.L+F.BOX_W : b.x>F.R-F.BOX_W) && b.y>F.GY1-70 && b.y<F.GY2+70;
+      if(inBox && !b.owner && dist(b.x,b.y,p.x,p.y)<150){gx=b.x;this.moveTo(p,b.x,b.y,dt,1.1);
+        if(dist(b.x,b.y,p.x,p.y)<22){this.gkGrab(p);} return;}
+      if(inBox && b.speed()>360){p.dive=0.35;}
+      this.moveTo(p,gx,lerp(p.y,gy,.5),dt,.9); return;
+    }
+    if(attacking){
+      if(carrier===p){ this.carry(p,dt,oppGoalX); return; }
+      // off-ball support: make a run into space ahead
+      const spread=(p.role==='FWD'?0.9:p.role==='MID'?0.55:0.2);
+      let tx=lerp(p.homeX, oppGoalX, spread*0.6);
+      tx=clamp(tx + dir*rnd(0,40), F.L+30,F.R-30);
+      let ty=p.homeY + Math.sin((m.time+p.number)*0.6)*40;
+      // pull toward goal if advanced attacker
+      if(p.role==='FWD' && Math.abs(carrier.x-oppGoalX)<400) ty=lerp(ty,clamp(b.y,F.GY1,F.GY2),.4);
+      this.moveTo(p,tx,ty,dt,.82); return;
+    }
+    // DEFENDING (or ball loose): closest presses ball, others mark/hold
+    const mates=m.players.filter(q=>q.team===p.team&&q.role!=='GK');
+    const closest=mates.reduce((a,q)=>dist(q.x,q.y,b.x,b.y)<dist(a.x,a.y,b.x,b.y)?q:a,mates[0]);
+    if(p===closest || (!b.owner && dist(p.x,p.y,b.x,b.y)<130)){
+      this.moveTo(p,b.x,b.y,dt,1.0);
+      if(dist(p.x,p.y,b.x,b.y)<26) m.tryTackle(p);
+      return;
+    }
+    // hold a zone between ball and own goal, biased to home slot
+    let tx=lerp(p.homeX,(b.x+ownGoalX)/2,.4), ty=lerp(p.homeY,b.y,.35);
+    this.moveTo(p,clamp(tx,F.L+20,F.R-20),clamp(ty,F.T+10,F.B-10),dt,.7);
+  }
+  carry(p,dt,goalX){
+    const m=this.m,b=m.ball,dir=p.team===0?1:-1;
+    const gy=clamp(b.y,F.GY1+16,F.GY2-16);
+    // shoot if in range and roughly central
+    const d=dist(p.x,p.y,goalX,F.CY);
+    const nearestDef=this.nearestOpp(p);
+    const pressured=nearestDef && dist(p.x,p.y,nearestDef.x,nearestDef.y)<40;
+    if(d<300 && Math.abs(p.y-F.CY)<200 && Math.random()<0.03+ p.get('Finishing')/4000){
+      m.shoot(p, goalX, gy); return;
+    }
+    // pass if pressured and a good option exists
+    if(pressured && Math.random()<0.06){
+      const opt=this.bestPass(p);
+      if(opt){m.passTo(p,opt);return;}
+    }
+    // dribble toward goal, curving around pressure
+    let tx=p.x+dir*60, ty=p.y;
+    if(pressured){ ty += (p.y<F.CY?1:-1)*40; }
+    ty=lerp(ty, gy, .15);
+    this.moveTo(p,clamp(tx,F.L+10,F.R-10),clamp(ty,F.T+16,F.B-16),dt, 1.0, true);
+  }
+  bestPass(p){
+    const m=this.m,dir=p.team===0?1:-1;
+    const mates=m.players.filter(q=>q.team===p.team&&q!==p&&q.role!=='GK');
+    let best=null,bs=-1e9;
+    for(const q of mates){
+      const fwd=(q.x-p.x)*dir;                      // prefer forward
+      const opp=this.nearestOpp(q);
+      const open=opp?dist(q.x,q.y,opp.x,opp.y):100;
+      const sc=fwd*0.6+open*1.2 - dist(p.x,p.y,q.x,q.y)*0.1;
+      if(sc>bs){bs=sc;best=q;}
+    }
+    return best;
+  }
+  nearestOpp(p){const m=this.m;let best=null,bd=1e9;
+    for(const q of m.players){if(q.team===p.team)continue;const d=dist(p.x,p.y,q.x,q.y);if(d<bd){bd=d;best=q;}}return best;}
+  moveTo(p,tx,ty,dt,mult=1,carrying=false){
+    const dx=tx-p.x,dy=ty-p.y,d=Math.hypot(dx,dy)||1;
+    const sp=this.m.playerSpeed(p)*mult*(p.team===this.m.userTeam&&this.m.userControl? this.m.diff:1);
+    p.vx=lerp(p.vx,dx/d*sp,0.2); p.vy=lerp(p.vy,dy/d*sp,0.2);
+  }
+  gkGrab(p){const m=this.m;m.ball.owner=p;m.ball.vx=m.ball.vy=0;m.setPossession(p.team);
+    m.showToast('🧤 Keeper collects',700);}
+}
+
+/* ============================ INPUT HANDLER ========================= */
+class InputHandler{
+  constructor(){this.k={};this.onKey=null;
+    addEventListener('keydown',e=>{if(['w','a','s','d','q','e',' ','shift'].includes(e.key.toLowerCase())||e.key==='Shift')e.preventDefault();
+      const k=e.key.toLowerCase();if(!this.k[k]&&this.onKey)this.onKey(k);this.k[k]=true;});
+    addEventListener('keyup',e=>{this.k[e.key.toLowerCase()]=false;});
+  }
+  clear(){this.k={};}
+}
+
+/* ============================== RENDERER ============================ */
+class Renderer{
+  constructor(cv){this.cv=cv;this.ctx=cv.getContext('2d');this.cam={x:F.CX,y:F.CY};this.shake=0;this.resize();
+    addEventListener('resize',()=>this.resize());}
+  resize(){const d=Math.min(devicePixelRatio||1,2);this.cv.width=innerWidth*d;this.cv.height=innerHeight*d;
+    this.ctx.setTransform(d,0,0,d,0,0);this.vw=innerWidth;this.vh=innerHeight;}
+  draw(m,zoom){
+    const ctx=this.ctx,cv=this.cv;
+    // camera follow ball
+    const b=m.ball; this.cam.x=lerp(this.cam.x,b.x,0.08); this.cam.y=lerp(this.cam.y,b.y,0.08);
+    const halfW=this.vw/2/zoom, halfH=this.vh/2/zoom;
+    this.cam.x=clamp(this.cam.x, Math.min(F.CX,F.L-10+halfW-0), Math.max(F.CX,F.R+10-halfW));
+    this.cam.y=clamp(this.cam.y, Math.min(F.CY,F.T-10+halfH), Math.max(F.CY,F.B+10-halfH));
+    if(F.W<this.vw/zoom)this.cam.x=F.CX; if(F.H<this.vh/zoom)this.cam.y=F.CY;
+    let sx=0,sy=0; if(this.shake>0){sx=rnd(-1,1)*this.shake;sy=rnd(-1,1)*this.shake;this.shake*=0.86;if(this.shake<.3)this.shake=0;}
+    ctx.clearRect(0,0,this.vw,this.vh);
+    ctx.save();
+    ctx.translate(this.vw/2+sx,this.vh/2+sy); ctx.scale(zoom,zoom); ctx.translate(-this.cam.x,-this.cam.y);
+    this.field(ctx);
+    // shadows + entities sorted by y for depth
+    const ents=[...m.players].sort((a,b2)=>a.y-b2.y);
+    for(const p of ents) this.shadow(ctx,p.x,p.y,11);
+    this.shadow(ctx,b.x,b.y,5);
+    for(const p of ents) this.player(ctx,p,m);
+    this.ball(ctx,b);
+    ctx.restore();
+  }
+  field(ctx){
+    // grass with mowing stripes
+    for(let i=0;i<14;i++){ctx.fillStyle=i%2?'#1f7a3f':'#1c7038';
+      ctx.fillRect(F.L + i*(F.R-F.L)/14, F.T, (F.R-F.L)/14+1, F.B-F.T);}
+    ctx.fillStyle='#14532a';ctx.fillRect(0,0,F.W,F.T);ctx.fillRect(0,F.B,F.W,F.H-F.B);ctx.fillRect(0,0,F.L,F.H);ctx.fillRect(F.R,0,F.W-F.R,F.H);
+    ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=3;
+    const R=(x,y,w,h)=>ctx.strokeRect(x,y,w,h);
+    R(F.L,F.T,F.R-F.L,F.B-F.T);
+    ctx.beginPath();ctx.moveTo(F.CX,F.T);ctx.lineTo(F.CX,F.B);ctx.stroke();
+    ctx.beginPath();ctx.arc(F.CX,F.CY,66,0,7);ctx.stroke();
+    ctx.beginPath();ctx.arc(F.CX,F.CY,4,0,7);ctx.fillStyle='#fff';ctx.fill();
+    // boxes both sides
+    for(const s of [0,1]){const gx=s===0?F.L:F.R,sgn=s===0?1:-1;
+      R(gx- (s?F.BOX_W:0), F.CY-F.BOX_H/2, F.BOX_W, F.BOX_H); // (approx – redrawn below)
+    }
+    // penalty + six-yard boxes (explicit)
+    this.box(ctx,F.L,1); this.box(ctx,F.R,-1);
+    // corner arcs
+    for(const [cx,cy] of [[F.L,F.T],[F.R,F.T],[F.L,F.B],[F.R,F.B]]){
+      ctx.beginPath();ctx.arc(cx,cy,14,0,7);ctx.stroke();}
+    // goals + nets
+    this.goal(ctx,F.L,1); this.goal(ctx,F.R,-1);
+  }
+  box(ctx,gx,sgn){
+    ctx.strokeRect(sgn>0?gx:gx-F.BOX_W, F.CY-F.BOX_H/2, F.BOX_W, F.BOX_H);
+    ctx.strokeRect(sgn>0?gx:gx-F.SIX_W, F.CY-F.SIX_H/2, F.SIX_W, F.SIX_H);
+    const px=gx+sgn*110; ctx.beginPath();ctx.arc(px,F.CY,3,0,7);ctx.fillStyle='#fff';ctx.fill();
+    ctx.beginPath();ctx.arc(px,F.CY,52,sgn>0?-1.0:2.14,sgn>0?1.0:4.14);ctx.stroke();
+  }
+  goal(ctx,gx,sgn){
+    const x2=gx-sgn*F.GOAL_D;
+    ctx.save();ctx.strokeStyle='#eef';ctx.lineWidth=3;
+    ctx.strokeRect(Math.min(gx,x2),F.GY1,F.GOAL_D,F.GOAL_H);
+    ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=1;
+    for(let i=1;i<7;i++){const yy=F.GY1+i*F.GOAL_H/7;ctx.beginPath();ctx.moveTo(Math.min(gx,x2),yy);ctx.lineTo(Math.max(gx,x2),yy);ctx.stroke();}
+    for(let i=1;i<4;i++){const xx=Math.min(gx,x2)+i*F.GOAL_D/4;ctx.beginPath();ctx.moveTo(xx,F.GY1);ctx.lineTo(xx,F.GY2);ctx.stroke();}
+    ctx.restore();
+  }
+  shadow(ctx,x,y,r){ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(x,y+11,r,r*0.45,0,0,7);ctx.fill();}
+  ball(ctx,b){ctx.save();ctx.translate(b.x,b.y);ctx.rotate(b.spin||0);
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,0,6,0,7);ctx.fill();
+    ctx.fillStyle='#222';for(let i=0;i<5;i++){const a=i/5*7;ctx.beginPath();ctx.arc(Math.cos(a)*2.6,Math.sin(a)*2.6,1.3,0,7);ctx.fill();}
+    ctx.strokeStyle='rgba(0,0,0,.4)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(0,0,6,0,7);ctx.stroke();ctx.restore();}
+  // ---- the 2D soccer player sprite (head, jersey, shorts, arms, legs, socks, cleats, number) ----
+  player(ctx,p,m){
+    const run=Math.hypot(p.vx,p.vy)>20; if(run)p.animT+=0.28; else p.animT*=0.9;
+    const t=p.animT, swing=Math.sin(t)* (run?5:0);
+    const c1=m.teams[p.team].c1, c2=m.teams[p.team].c2;
+    const controlled = (p.team===m.userTeam && p===m.userPlayer && m.userControl);
+    ctx.save();ctx.translate(p.x,p.y);
+    const flip=p.vx<-6?-1:1; ctx.scale(flip,1);
+    // marker under controlled player
+    if(controlled && Game.settings.arrow){ctx.strokeStyle=c2;ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,13,15,0.15,Math.PI-0.15);ctx.stroke();
+      ctx.fillStyle=c2;ctx.beginPath();ctx.moveTo(0,-24);ctx.lineTo(-4,-31);ctx.lineTo(4,-31);ctx.fill();}
+    const diving=p.dive>0;
+    if(diving){ctx.rotate((flip>0?1:-1)*1.1);}
+    // legs (with socks + cleats)
+    const legY=6;
+    for(const s of [-1,1]){const off=s*swing;
+      ctx.strokeStyle=c1;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(s*3,legY);ctx.lineTo(s*3+off*0.3,legY+9);ctx.stroke();
+      // sock
+      ctx.strokeStyle=c2;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(s*3+off*0.3,legY+9);ctx.lineTo(s*3+off*0.5,legY+14);ctx.stroke();
+      // cleat
+      ctx.fillStyle='#111';ctx.fillRect(s*3+off*0.5-2, legY+14, 5,3);}
+    // shorts
+    ctx.fillStyle=c1;ctx.fillRect(-6,legY-4,12,7);
+    ctx.fillStyle='rgba(0,0,0,.18)';ctx.fillRect(-1,legY-4,2,7);
+    // arms
+    for(const s of [-1,1]){ctx.strokeStyle=c2;ctx.lineWidth=3;ctx.beginPath();
+      ctx.moveTo(s*6,-8);ctx.lineTo(s*8,-1 - (p.anim==='celebrate'? 10:0) - Math.sin(t+ (s>0?0:3))*(run?3:0));ctx.stroke();}
+    // jersey (torso)
+    ctx.fillStyle=c1;ctx.beginPath();ctx.moveTo(-7,-9);ctx.lineTo(7,-9);ctx.lineTo(6,legY-3);ctx.lineTo(-6,legY-3);ctx.closePath();ctx.fill();
+    ctx.fillStyle=c2;ctx.fillRect(-7,-9,3,legY+6); // side trim
+    // number
+    ctx.fillStyle=c2;ctx.font='bold 7px Arial';ctx.textAlign='center';ctx.scale(flip,1);
+    ctx.fillText(p.number, 0, -1); ctx.scale(flip,1);
+    // neck + head + hair
+    ctx.fillStyle='#e8b98a';ctx.fillRect(-2,-12,4,3);
+    ctx.fillStyle='#f0c79a';ctx.beginPath();ctx.arc(0,-15,5,0,7);ctx.fill();
+    ctx.fillStyle='#3a2a1a';ctx.beginPath();ctx.arc(0,-16.5,5,Math.PI,7);ctx.fill();
+    ctx.restore();
+    // name tag
+    if(Game.settings.names){ctx.fillStyle='rgba(0,0,0,.45)';ctx.font='7px Arial';ctx.textAlign='center';
+      const w=ctx.measureText(p.name).width+6;ctx.fillRect(p.x-w/2,p.y-34,w,9);
+      ctx.fillStyle=controlled?c2:'#dfe';ctx.fillText(p.name,p.x,p.y-27);}
+  }
+}
+
+/* =============================== MATCH ============================== */
+class Match{
+  constructor(teamA,teamB,opt={}){
+    this.teams=[teamA,teamB];
+    this.opt={minutes:5,diff:1,userControl:true,userTeam:0,knockout:false,...opt};
+    this.diff=this.opt.diff; this.userControl=this.opt.userControl; this.userTeam=this.opt.userTeam;
+    this.ball=new Ball(); this.ai=new AIController(this);
+    this.score=[0,0]; this.events=[]; this.time=0; this.duration=this.opt.minutes*60;
+    this.shots=[0,0]; this.sot=[0,0]; this.corners=[0,0]; this.yellow=[0,0]; this.red=[0,0];
+    this.possFrames=[0,0]; this.possTeam=0; this.pstats={};
+    this.paused=false; this.over=false; this.restart=0; this.lastTouch=0; this.celebrate=0;
+    this.players=[]; this.spawn(); this.userPlayer=this.nearestTo(this.userTeam,this.ball);
+    this.kickoff(0);
+  }
+  ps(p){if(!this.pstats[p.name+'#'+p.team])this.pstats[p.name+'#'+p.team]={p,goals:0,team:p.team};return this.pstats[p.name+'#'+p.team];}
+  spawn(){
+    for(let t=0;t<2;t++){
+      const squad=this.teams[t].clonePlayers ? this.teams[t].players : this.teams[t].players;
+      this.teams[t].live=this.teams[t].clonePlayers();
+      this.teams[t].live.forEach((p,i)=>{
+        p.team=t; const f=FORMATION[i];
+        const fx=t===0?f[0]:1-f[0];
+        p.homeX=F.L+fx*(F.R-F.L); p.homeY=F.T+f[1]*(F.B-F.T);
+        p.x=p.homeX;p.y=p.homeY; this.players.push(p);
+      });
+    }
+  }
+  playerSpeed(p){return (95+ p.spd()*1.35) * (p.staminaMul||1);}
+  nearestTo(team,pt){let best=null,bd=1e9;for(const p of this.players){if(p.team!==team||p.role==='GK')continue;
+    const d=dist(p.x,p.y,pt.x,pt.y);if(d<bd){bd=d;best=p;}}return best;}
+  setPossession(t){this.possTeam=t;}
+  kickoff(scoringTeamJustConceded){
+    // reset to formation, give ball to a midfielder at center
+    for(const p of this.players){const t=p.team;const i=this.players.indexOf(p);}
+    this.players.forEach(p=>{const idx=this.teams[p.team].live.indexOf(p);const f=FORMATION[idx];
+      const fx=p.team===0?f[0]:1-f[0];p.x=F.L+fx*(F.R-F.L);p.y=F.T+f[1]*(F.B-F.T);p.vx=p.vy=0;});
+    this.ball.reset(F.CX,F.CY);
+    const kt=scoringTeamJustConceded; // team that kicks off
+    const mid=this.teams[kt].live.find(p=>p.role==='MID')||this.teams[kt].live[6];
+    mid.x=F.CX- (kt===0?18:-18);mid.y=F.CY;this.ball.owner=mid;this.setPossession(kt);
+    this.lastTouch=kt;
+  }
+  update(dt,input){
+    if(this.paused||this.over)return;
+    this.time+=dt;
+    if(this.restart>0){this.restart-=dt; this.physics(dt); return;}
+    // user control
+    if(this.userControl && this.userPlayer) this.userInput(input,dt);
+    // AI for everyone else
+    for(const p of this.players){
+      if(p.dive>0){p.dive-=dt;}
+      if(p.slide>0){p.slide-=dt;}
+      if(p.cooldown>0)p.cooldown-=dt;
+      p.staminaMul = 1; // recompute below when sprinting
+      if(p===this.userPlayer && this.userControl) continue;
+      this.ai.think(p,dt);
+    }
+    this.physics(dt);
+    // possession accounting
+    this.possFrames[this.possTeam]++;
+    // timer / halves / end
+    if(this.time>=this.duration){this.endMatch();}
+  }
+  userInput(input,dt){
+    const p=this.userPlayer,k=input.k;
+    let mx=0,my=0; if(k['w'])my--; if(k['s'])my++; if(k['a'])mx--; if(k['d'])mx++;
+    const sprint=k['shift']&&p.stamina>0.05;
+    if(sprint){p.stamina=Math.max(0,p.stamina-dt*0.25);} else {p.stamina=Math.min(1,p.stamina+dt*0.12);}
+    p.staminaMul = sprint?1.42:1;
+    if(mx||my){const d=Math.hypot(mx,my);const sp=this.playerSpeed(p);
+      p.vx=lerp(p.vx,mx/d*sp,0.35);p.vy=lerp(p.vy,my/d*sp,0.35);}
+    else{p.vx*=0.6;p.vy*=0.6;}
+    // shoot charge
+    if(this.ball.owner===p){
+      if(k[' ']){this.charge=Math.min(1,(this.charge||0)+dt*1.6);}
+      else if(this.charge){const goalX=p.team===0?F.R:F.L;this.shoot(p,goalX,clamp(this.ball.y,F.GY1+14,F.GY2-14),this.charge);this.charge=0;}
+    } else {this.charge=0;}
+  }
+  onKey(k){ // discrete presses
+    if(this.paused||this.over||this.restart>0)return;
+    const p=this.userPlayer; if(!p||!this.userControl)return;
+    if(k==='q'){this.switchPlayer();}
+    else if(k==='e'){ if(this.ball.owner===p){const opt=this.ai.bestPass(p);if(opt)this.passTo(p,opt);} }
+    else if(k===' '){ if(this.ball.owner!==p){this.slideTackle(p);} }
+  }
+  switchPlayer(){const n=this.nearestTo(this.userTeam,this.ball); if(n)this.userPlayer=n;}
+  slideTackle(p){ if(p.cooldown>0)return; p.cooldown=0.8;p.slide=0.4;p.anim='tackle';
+    const b=this.ball; const dx=b.x-p.x,dy=b.y-p.y,d=Math.hypot(dx,dy)||1;
+    p.vx=dx/d*260;p.vy=dy/d*260;
+    setTimeout(()=>{},0);
+    // resolve immediately if close
+    if(d<40){ this.tryTackle(p,true); }
+  }
+  physics(dt){
+    // move players, clamp, stamina regen for AI
+    for(const p of this.players){
+      if(p!==this.userPlayer||!this.userControl){ if(p.staminaMul===undefined)p.staminaMul=1; }
+      p.x+=p.vx*dt;p.y+=p.vy*dt;
+      p.x=clamp(p.x,F.L-30,F.R+30);p.y=clamp(p.y,F.T-24,F.B+24);
+    }
+    const b=this.ball;
+    if(b.owner){
+      const o=b.owner; const mv=Math.hypot(o.vx,o.vy);
+      const dirx=o.vx/(mv||1), diry=o.vy/(mv||1);
+      // dribble: ball nudged ahead of carrier
+      const lead=mv>20?16:12;
+      b.x=lerp(b.x, o.x+dirx*lead, 0.5); b.y=lerp(b.y, o.y+diry*lead,0.5);
+      b.vx=o.vx;b.vy=o.vy; b.spin+=mv*dt*0.02;
+      // opponents can intercept a loose-ish dribble
+      for(const q of this.players){if(q.team===o.team)continue;
+        if(dist(q.x,q.y,b.x,b.y)<15 && q.cooldown<=0){ this.tryTackle(q); break; }}
+    } else {
+      PhysicsEngine.stepBall(b,dt);
+      // control acquisition
+      let cand=null,cd=17;
+      for(const p of this.players){if(p.cooldown>0)continue;const d=dist(p.x,p.y,b.x,b.y);
+        if(d<cd && (p.role!=='GK' || (p.team===0? b.x<F.L+F.BOX_W:b.x>F.R-F.BOX_W))){cd=d;cand=p;}}
+      if(cand && b.speed()<420){ b.owner=cand;this.setPossession(cand.team);this.lastTouch=cand.team;b.vx=b.vy=0; }
+      this.checkBounds();
+    }
+  }
+  tryTackle(defender,slide=false){
+    const b=this.ball,carrier=b.owner; if(!carrier||carrier.team===defender.team)return;
+    const win = (defender.get('Tackling')+defender.get('Defending'))/2 + rnd(-20,20)*(slide?1:1.3);
+    const keep = (carrier.get('Dribbling')+carrier.get('Strength'))/2 + rnd(-10,15);
+    if(win>keep){ // ball won / knocked loose
+      b.owner=null;const dx=rnd(-1,1),dy=rnd(-1,1),d=Math.hypot(dx,dy)||1;
+      b.vx=dx/d*140;b.vy=dy/d*140; carrier.cooldown=0.4; defender.cooldown=0.25;
+      this.lastTouch=defender.team; this.setPossession(defender.team);
+    } else if(slide && Math.random()<0.4){ // mistimed slide -> foul
+      this.foul(defender,carrier);
+    }
+  }
+  foul(offender,victim){
+    this.restart=0.9; const b=this.ball; b.owner=null;b.vx=b.vy=0;
+    // card chance
+    let card='';
+    if(Math.random()<0.12){offender.cardY++;this.yellow[offender.team]++;card=' 🟨';
+      if(offender.cardY>=2){offender.cardR=1;this.red[offender.team]++;card=' 🟥 (2nd yellow)';}}
+    this.showToast('Foul!'+card,1100);
+    // give ball to victim's team at spot
+    b.x=clamp(victim.x,F.L+8,F.R-8);b.y=clamp(victim.y,F.T+8,F.B-8);
+    const taker=this.nearestTo(victim.team,b); if(taker){taker.x=b.x-(victim.team===0?16:-16);taker.y=b.y;b.owner=taker;}
+    this.setPossession(victim.team);this.lastTouch=victim.team;
+  }
+  shoot(p,gx,gy,power=0.85){
+    const b=this.ball; if(b.owner!==p)return; b.owner=null;
+    const acc=p.get('Shooting')/100, fin=p.get('Finishing')/100;
+    const spread=(1-acc)*70*(1-power*0.4);
+    const tx=gx, ty=gy+rnd(-spread,spread);
+    const dx=tx-p.x,dy=ty-p.y,d=Math.hypot(dx,dy)||1;
+    const speed=380+power*320+fin*80;
+    b.vx=dx/d*speed;b.vy=dy/d*speed;
+    p.cooldown=0.4;this.lastTouch=p.team;this.shots[p.team]++;
+    // on target?
+    if(Math.abs(ty-F.CY)<F.GOAL_H/2) this.sot[p.team]++;
+    this.showToast('Shot!',500);
+  }
+  passTo(p,target){
+    const b=this.ball; if(b.owner!==p)return; b.owner=null;
+    const dx=target.x-p.x,dy=target.y-p.y,d=Math.hypot(dx,dy)||1;
+    const lead=Math.hypot(target.vx,target.vy)*0.25;
+    const tx=target.x+target.vx*0.001*lead, ty=target.y+target.vy*0.001*lead;
+    const ddx=tx-p.x,ddy=ty-p.y,dd=Math.hypot(ddx,ddy)||1;
+    const speed=clamp(dd*2.4,240,520);
+    b.vx=ddx/dd*speed;b.vy=ddy/dd*speed;
+    p.cooldown=0.3;this.lastTouch=p.team;
+    // auto-switch control to receiver for user team
+    if(p.team===this.userTeam&&this.userControl)this.userPlayer=target;
+  }
+  checkBounds(){
+    const b=this.ball;
+    // goals
+    if(b.x<F.L && b.y>F.GY1 && b.y<F.GY2){ this.goal(0);return; }
+    if(b.x>F.R && b.y>F.GY1 && b.y<F.GY2){ this.goal(1);return; }
+    // goal line out (not goal) -> corner or goal kick
+    if(b.x<F.L-4 || b.x>F.R+4){
+      const leftSide=b.x<F.CX; const defTeam=leftSide?0:1;
+      const attackingLast=this.lastTouch!==defTeam;
+      b.vx=b.vy=0;
+      if(attackingLast){ // goal kick to defending team
+        const gk=this.teams[defTeam].live.find(pl=>pl.role==='GK');
+        b.x=leftSide?F.L+F.SIX_W:F.R-F.SIX_W; b.y=F.CY; b.owner=gk; if(gk){gk.x=b.x-(defTeam===0?14:-14);gk.y=F.CY;}
+        this.setPossession(defTeam);this.lastTouch=defTeam;this.showToast('Goal kick',700);
+      } else { // corner to attacking team
+        this.corners[1-defTeam]++;
+        b.x=leftSide?F.L:F.R; b.y=b.y<F.CY?F.T:F.B; b.owner=null;
+        const taker=this.nearestTo(1-defTeam,b);if(taker){taker.x=b.x;taker.y=b.y;b.owner=taker;}
+        this.setPossession(1-defTeam);this.lastTouch=1-defTeam;this.showToast('Corner!',700);
+      }
+      this.restart=0.6;return;
+    }
+    // sideline -> throw-in to team that didn't touch last
+    if(b.y<F.T-4 || b.y>F.B+4){
+      b.vx=b.vy=0;b.owner=null; const team=1-this.lastTouch;
+      b.x=clamp(b.x,F.L+6,F.R-6); b.y=b.y<F.CY?F.T:F.B;
+      const taker=this.nearestTo(team,b);if(taker){taker.x=b.x;taker.y=clamp(b.y,F.T+6,F.B-6);b.owner=taker;}
+      this.setPossession(team);this.lastTouch=team;this.showToast('Throw-in',600);this.restart=0.5;return;
+    }
+  }
+  goal(team){
+    this.score[team]++; const scorer=this.nearestTo(team,{x:this.ball.x,y:this.ball.y})||this.teams[team].live[9];
+    const min=Math.max(1,Math.round(this.time/this.duration*90));
+    this.events.push({team,name:scorer.name,min}); this.ps(scorer).goals++;
+    this.celebrate=1.4; scorer.anim='celebrate';
+    if(Game.settings.shake)this.render&&(this.render.shake=8);
+    Game.renderer.shake=8;
+    this.showToast('⚽ GOAL! '+scorer.name,1600);
+    Game.updateHUD(this);
+    this.restart=1.6; setTimeout(()=>{ if(!this.over){this.kickoff(1-team);} },900);
+  }
+  endMatch(){
+    if(this.over)return;
+    if(this.opt.knockout && this.score[0]===this.score[1]){
+      // quick auto penalty shootout for ties
+      const so=this.shootout(); this.shootoutScore=so;
+      this.winner = so[0]>so[1]?0:1;
+    } else {
+      this.winner = this.score[0]>this.score[1]?0: this.score[1]>this.score[0]?1:null;
+    }
+    this.over=true; this.buildResult(); Game.onMatchEnd(this);
+  }
+  shootout(){
+    const sc=[0,0]; const takers=t=>this.teams[t].live.filter(p=>p.role!=='GK').sort((a,b)=>b.get('Penalties')-a.get('Penalties')).slice(0,5);
+    const T=[takers(0),takers(1)],gk=[this.teams[1].live.find(p=>p.role==='GK'),this.teams[0].live.find(p=>p.role==='GK')];
+    for(let i=0;i<5;i++)for(let t=0;t<2;t++){const pk=T[t][i];const prob=clamp((pk.get('Penalties')-(gk[t]?gk[t].get('Goalkeeping'):55)*.5+35)/100,.4,.9);if(Math.random()<prob)sc[t]++;}
+    while(sc[0]===sc[1]){const a=Math.random()<.75?1:0,b2=Math.random()<.75?1:0;sc[0]+=a;sc[1]+=b2;if(a!==b2)break;}
+    return sc;
+  }
+  buildResult(){
+    const total=this.possFrames[0]+this.possFrames[1]||1;
+    const poss=[Math.round(this.possFrames[0]/total*100)]; poss.push(100-poss[0]);
+    // MOTM = top scorer, tiebreak winning team
+    let motm=null,bg=-1;for(const k in this.pstats){const s=this.pstats[k];const v=s.goals*2+(s.team===this.winner?1:0);if(v>bg){bg=v;motm=s;}}
+    this.result={teams:[this.teams[0].name,this.teams[1].name],score:[...this.score],
+      shootout:this.shootoutScore||null,winner:this.winner,
+      scorers:this.events.map(e=>({...e})),possession:poss,shots:[...this.shots],sot:[...this.sot],
+      corners:[...this.corners],yellow:[...this.yellow],red:[...this.red],
+      motm:motm?motm.p.name:'-', motmTeam:motm?motm.team:0,
+      pstats:Object.values(this.pstats).map(s=>({name:s.p.name,team:s.team,goals:s.goals}))};
+  }
+  showToast(txt,ms){const el=$('#toast2');el.textContent=txt;el.classList.add('show');clearTimeout(this._tt);this._tt=setTimeout(()=>el.classList.remove('show'),ms||900);}
+}
+
+/* ====================== INSTANT MATCH SIMULATION ==================== */
+const SimEngine={
+  simulate(A,B,knockout=false){
+    const str=t=>{const p=t.players;const avg=(f)=>p.reduce((s,x)=>s+f(x),0)/p.length;
+      return{atk:avg(x=>(x.overall+x.get('Finishing')+x.get('Shooting'))/3),
+        def:avg(x=>(x.overall+x.get('Defending'))/2),
+        cre:avg(x=>(x.get('Passing')+x.get('Vision'))/2)};};
+    const sa=str(A),sb=str(B); const ev=[];const score=[0,0];
+    const shots=[0,0],sot=[0,0],corners=[0,0],yellow=[0,0],red=[0,0];
+    const scorer=t=>{const cand=t.players.filter(p=>p.role!=='GK');
+      const items=cand.map(p=>({p,w:({FWD:5,MID:3,DEF:1}[p.role]||1)*(p.get('Finishing')+p.get('Shooting'))}));
+      const tot=items.reduce((s,x)=>s+x.w,0);let r=Math.random()*tot;for(const it of items){if((r-=it.w)<=0)return it.p;}return cand[0];};
+    for(let m=1;m<=90;m++){
+      for(let t=0;t<2;t++){const me=t?sb:sa,opp=t?sa:sb;
+        const chance=0.055+(me.atk-opp.def)/2200 + (me.cre-60)/4000;
+        if(Math.random()<chance){shots[t]++;
+          if(Math.random()<0.5){sot[t]++;
+            const gkSkill=(t?A:B).players.find(p=>p.role==='GK'); const gs=gkSkill?gkSkill.get('Goalkeeping'):60;
+            if(Math.random()< clamp((me.atk-gs*0.6+26)/100,.1,.85)){const s=scorer(t?B:A);score[t]++;ev.push({team:t,name:s.name,min:m});}
+          } else if(Math.random()<0.35) corners[t]++;
+        }
+        if(Math.random()<0.006)yellow[t]++;
+        if(Math.random()<0.0007)red[t]++;
+      }
+    }
+    let winner=score[0]>score[1]?0:score[1]>score[0]?1:null, shootout=null;
+    if(knockout && winner===null){shootout=[0,0];
+      for(let i=0;i<5;i++){if(Math.random()<.75)shootout[0]++;if(Math.random()<.72)shootout[1]++;}
+      while(shootout[0]===shootout[1]){const a=Math.random()<.75?1:0,b=Math.random()<.75?1:0;shootout[0]+=a;shootout[1]+=b;if(a!==b)break;}
+      winner=shootout[0]>shootout[1]?0:1;}
+    const poss0=clamp(Math.round(50+(sa.cre-sb.cre)+rnd(-6,6)),25,75);
+    const allGoals=ev.slice();
+    const top=(()=>{const c={};allGoals.forEach(g=>{const key=g.name+g.team;c[key]=(c[key]||0)+1;});
+      let best=null,bv=0;for(const g of allGoals){const key=g.name+g.team;if(c[key]>bv){bv=c[key];best=g;}}return best;})();
+    return{teams:[A.name,B.name],score,shootout,winner,scorers:ev,possession:[poss0,100-poss0],
+      shots,sot,corners,yellow,red,motm:top?top.name:(winner!==null?(winner?B:A).players[9].name:'-'),motmTeam:top?top.team:(winner||0),
+      pstats:ev.reduce((acc,g)=>{const k=acc.find(x=>x.name===g.name&&x.team===g.team);if(k)k.goals++;else acc.push({name:g.name,team:g.team,goals:1});return acc;},[])};
+  }
+};
+
+/* ============================ TOURNAMENT ============================ */
+class Tournament{
+  constructor(teams,opt={}){
+    this.teams=teams; this.opt={thirdPlace:true,minutes:3,...opt};
+    this.rounds=[];                 // [{name, ties:[{a,b,result,winner,loser}]}]
+    this.third=null; this.champion=null;
+    this.stats={goals:{},assists:{},clean:{}};
+    this._seed();
+  }
+  _seed(){
+    const n=this.teams.length; const names={4:'Semifinals',8:'Quarterfinals',16:'Round of 16',32:'Round of 32'};
+    const ties=[]; for(let i=0;i<n;i+=2)ties.push({a:this.teams[i],b:this.teams[i+1]||this.teams[0],result:null});
+    this.rounds.push({name:names[n]||('Round of '+n),ties});
+  }
+  currentRound(){return this.rounds[this.rounds.length-1];}
+  roundLabel(n){return {2:'Final',4:'Semifinals',8:'Quarterfinals',16:'Round of 16',32:'Round of 32'}[n]||('Round of '+n);}
+  recordResult(tie,res){
+    tie.result=res; tie.winner=res.winner===0?tie.a:tie.b; tie.loser=res.winner===0?tie.b:tie.a;
+    res.pstats.forEach(s=>{const team=s.team===0?tie.a:tie.b;const key=s.name;this.stats.goals[key]=(this.stats.goals[key]||0)+s.goals;});
+    // clean sheet if opponent scored 0
+    if(res.score[1]===0){const gk=tie.a.players.find(p=>p.role==='GK');if(gk)this.stats.clean[gk.name]=(this.stats.clean[gk.name]||0)+1;}
+    if(res.score[0]===0){const gk=tie.b.players.find(p=>p.role==='GK');if(gk)this.stats.clean[gk.name]=(this.stats.clean[gk.name]||0)+1;}
+    this._maybeAdvance();
+  }
+  _maybeAdvance(){
+    const r=this.currentRound(); if(!r.ties.every(t=>t.result))return;
+    const winners=r.ties.map(t=>t.winner), losers=r.ties.map(t=>t.loser);
+    if(winners.length===1){ this.champion=winners[0];
+      if(this.opt.thirdPlace && losers.length>=2 && r.name==='Final'){} return; }
+    if(winners.length===2){ // this was semis -> set final (+third place)
+      if(this.opt.thirdPlace) this.third={a:losers[0],b:losers[1],result:null,thirdPlace:true};
+      this.rounds.push({name:'Final',ties:[{a:winners[0],b:winners[1],result:null}]}); return;
+    }
+    const ties=[];for(let i=0;i<winners.length;i+=2)ties.push({a:winners[i],b:winners[i+1],result:null});
+    this.rounds.push({name:this.roundLabel(winners.length),ties});
+  }
+  topScorers(){return Object.entries(this.stats.goals).sort((a,b)=>b[1]-a[1]).slice(0,5);}
+  cleanSheets(){return Object.entries(this.stats.clean).sort((a,b)=>b[1]-a[1]).slice(0,5);}
+}
+
+/* =============================== GAME ============================== */
+const Game={
+  teams:[], tournament:null, match:null, raf:null, last:0, zoom:1.25,
+  settings:{names:true,arrow:true,shake:true},
+  renderer:null, input:null,
+  init(){
+    this.teams=presetTeams(16);
+    this.renderer=new Renderer($('#cv'));
+    this.input=new InputHandler();
+    this.input.onKey=k=>{if(this.match)this.match.onKey(k); if(k==='escape'&&this.match)this.togglePause();};
+    // nav buttons
+    $$('[data-go]').forEach(b=>b.onclick=()=>this.show(b.dataset.go));
+    this.bindMenus();
+    this.loop=this.loop.bind(this);
+    requestAnimationFrame(this.loop);
+    this.show('menu');
+  },
+  show(name){
+    if(name!=='match'){ if(this.match){cancelMatch();} $('#gameScreen').classList.remove('active'); }
+    $$('.screen').forEach(s=>s.classList.remove('active'));
+    const map={menu:'menuScreen',playSetup:'playSetupScreen',creator:'creatorScreen',settings:'settingsScreen',tourSetup:'tourSetupScreen',tour:'tourScreen'};
+    if(map[name]){$('#'+map[name]).classList.add('active');}
+    if(name==='playSetup')this.fillPlaySetup();
+    if(name==='creator')this.renderCreator();
+    if(name==='tourSetup')this.renderTourSetup();
+    if(name==='tour')this.renderTournament();
+  },
+  /* ---------- Play setup ---------- */
+  fillPlaySetup(){
+    const opt=this.teams.map((t,i)=>`<option value="${i}">${t.name} (${t.overall})</option>`).join('');
+    $('#psTeamA').innerHTML=opt; $('#psTeamB').innerHTML=opt; $('#psTeamB').selectedIndex=1;
+  },
+  /* ---------- Team creator ---------- */
+  renderCreator(){
+    this.draft=this.draft||{name:'',c1:'#2f7bff',c2:'#ffffff',players:makeSquad(78)};
+    const list=$('#ccList');
+    list.innerHTML=`<table><tr><th>#</th><th>Name</th><th>Pos</th><th>OVR</th><th>Signature</th></tr>`+
+      this.draft.players.map((p,i)=>`<tr>
+        <td>${p.number}</td>
+        <td><input value="${p.name}" data-ci="${i}" class="ccN" style="width:110px"></td>
+        <td><select data-ci="${i}" class="ccP">${['GK','DEF','MID','FWD'].map(r=>`<option ${r===p.role?'selected':''}>${r}</option>`).join('')}</select></td>
+        <td><input type="number" min="1" max="100" value="${p.overall}" data-ci="${i}" class="ccO" style="width:60px"></td>
+        <td><select data-ci="${i}" class="ccS">${SIG_STATS.map(s=>`<option ${s===p.signature?'selected':''}>${s}</option>`).join('')}</select></td></tr>`).join('')+`</table>`;
+    $$('.ccN',list).forEach(el=>el.onchange=()=>this.draft.players[+el.dataset.ci].name=el.value);
+    $$('.ccP',list).forEach(el=>el.onchange=()=>{const p=this.draft.players[+el.dataset.ci];p.role=el.value;p.stats=Player.roll(p.overall,p.role,p.signature);});
+    $$('.ccO',list).forEach(el=>el.onchange=()=>{const p=this.draft.players[+el.dataset.ci];p.overall=clamp(+el.value||70,1,100);p.stats=Player.roll(p.overall,p.role,p.signature);});
+    $$('.ccS',list).forEach(el=>el.onchange=()=>{const p=this.draft.players[+el.dataset.ci];p.signature=el.value;p.stats=Player.roll(p.overall,p.role,p.signature);});
+    $('#ccGen').onclick=()=>{const base=clamp(+$('#ccSkill').value||78,40,95);this.draft.players=makeSquad(base,Array.from({length:11},()=>pick(NAMEBANK)));this.renderCreator();};
+    $('#ccAdd').onclick=()=>{const i=this.draft.players.length;this.draft.players.push(new Player({name:pick(NAMEBANK),role:'MID',overall:75,signature:'Passing',number:i+1}));this.renderCreator();};
+    $('#ccName').oninput=e=>this.draft.name=e.target.value;
+    $('#ccC1').oninput=e=>this.draft.c1=e.target.value;
+    $('#ccC2').oninput=e=>this.draft.c2=e.target.value;
+    $('#ccSave').onclick=()=>{
+      const nm=($('#ccName').value||this.draft.name||'').trim(); if(!nm){alert('Enter a team name');return;}
+      this.teams.push(new Team({name:nm,c1:this.draft.c1,c2:this.draft.c2,players:this.draft.players}));
+      this.draft=null; this.renderCreator(); alert('Team saved: '+nm);
+    };
+    // team gallery
+    $('#ccCount').textContent=this.teams.length;
+    $('#ccTeams').innerHTML=this.teams.map((t,i)=>`<div class="teamchip">
+      <span class="swatch" style="background:${t.c1}"></span><span class="swatch" style="background:${t.c2}"></span>
+      <b style="flex:1">${t.name}</b><span class="mini">${t.overall}</span>
+      ${i>=16?`<button class="btn danger sm" data-del="${i}">✕</button>`:''}</div>`).join('');
+    $$('[data-del]','#ccTeams'&&$('#ccTeams')).forEach(b=>b.onclick=()=>{this.teams.splice(+b.dataset.del,1);this.renderCreator();});
+  },
+  /* ---------- Tournament setup ---------- */
+  renderTourSetup(){
+    const build=()=>{
+      const n=+$('#tsSize').value;
+      const slots=$('#tsSlots'); const opt=this.teams.map((t,i)=>`<option value="${i}">${t.name}</option>`).join('');
+      let html='';for(let i=0;i<n;i++)html+=`<div class="row"><span class="mini" style="width:22px">${i+1}.</span>
+        <select class="tsSlot" data-s="${i}" style="flex:1">${opt}</select></div>`;
+      slots.innerHTML=html;
+      $$('.tsSlot',slots).forEach((s,i)=>s.selectedIndex=i%this.teams.length);
+    };
+    $('#tsSize').onchange=build; build();
+    $('#tsRandom').onclick=()=>{const idx=this.teams.map((_,i)=>i);for(let i=idx.length-1;i>0;i--){const j=irnd(0,i);[idx[i],idx[j]]=[idx[j],idx[i]];}
+      $$('.tsSlot').forEach((s,i)=>s.selectedIndex=idx[i%idx.length]);};
+    $('#tsBuild').onclick=()=>{
+      const chosen=$$('.tsSlot').map(s=>this.teams[+s.value]);
+      this.tournament=new Tournament(chosen,{thirdPlace:$('#ts3rd').value==='1',minutes:+$('#tsLen').value});
+      this.show('tour');
+    };
+  },
+  /* ---------- Tournament bracket render ---------- */
+  renderTournament(){
+    const T=this.tournament; if(!T)return;
+    $('#tourStage').textContent='· '+(T.champion?'Complete':T.currentRound().name);
+    $('#tourChampion').innerHTML=T.champion?`<div class="pill" style="font-size:1.1rem;margin-top:6px">
+      <span class="swatch" style="background:${T.champion.c1}"></span>🏆 Champions: <b>${T.champion.name}</b></div>`:'';
+    // stats
+    const sc=T.topScorers(),cs=T.cleanSheets();
+    $('#tourStats').innerHTML=`
+      <div class="teamchip" style="display:block"><div class="mini">👟 Top scorers</div>${sc.length?sc.map(([n,g])=>`${n} — <b>${g}</b>`).join('<br>'):'—'}</div>
+      <div class="teamchip" style="display:block"><div class="mini">🛡 Clean sheets</div>${cs.length?cs.map(([n,g])=>`${n} — <b>${g}</b>`).join('<br>'):'—'}</div>
+      <div class="teamchip" style="display:block"><div class="mini">ℹ️ Teams</div>${T.teams.length} · ${T.opt.minutes}-min live matches</div>`;
+    // bracket columns
+    const box=$('#bracketBox'); let cols='';
+    T.rounds.forEach((r,ri)=>{ cols+=`<div class="round"><h4>${r.name}</h4>`+
+      r.ties.map((tie,ti)=>this.tieHTML(tie,ri,ti)).join('')+`</div>`; });
+    if(T.champion){cols+=`<div class="round"><h4>🏆 Champion</h4><div class="tie"><div class="side win">
+      <div class="tteam"><span class="swatch" style="background:${T.champion.c1}"></span><span class="nm">${T.champion.name}</span></div></div></div>`;
+      if(T.third)cols+=`<h4 style="margin-top:12px">3rd place</h4>${this.tieHTML(T.third,'third',0)}`;
+      cols+=`</div>`;}
+    box.innerHTML=`<div class="bracket">${cols}</div>`;
+    this.wireBracket(); requestAnimationFrame(()=>this.drawLines());
+    $('#tourSimRound').onclick=()=>this.simRound();
+  },
+  tieHTML(tie,ri,ti){
+    const played=!!tie.result; const s=played?tie.result.score:[null,null];
+    const so=played&&tie.result.shootout?tie.result.shootout:null;
+    const winA=played&&tie.result.winner===0, winB=played&&tie.result.winner===1;
+    const drag=!played && ri!=='third';
+    const side=(t,sc,win,side2)=>`<div class="side ${win?'win':''}">
+      <div class="tteam" ${drag&&t?`draggable="true" data-loc="${ri}|${ti}|${side2}"`:''}>
+        <span class="swatch" style="background:${t?t.c1:'#333'}"></span><span class="nm">${t?t.name:'TBD'}</span></div>
+      <span>${sc!==null?sc:''}${win&&so?` (${so[side2]})`:''}</span></div>`;
+    let acts='';
+    if(!played && tie.a && tie.b){
+      acts=`<div class="acts">
+        <button class="btn sm" data-play="${ri}|${ti}">▶️ Play</button>
+        <button class="btn sec sm" data-sim="${ri}|${ti}">⏩ Sim</button>
+        <button class="btn sec sm" data-watch="${ri}|${ti}">👁 Watch AI</button></div>`;
+    }
+    return `<div class="tie" data-node="${ri}|${ti}">${side(tie.a,s[0],winA,0)}${side(tie.b,s[1],winB,1)}${acts}</div>`;
+  },
+  wireBracket(){
+    const box=$('#bracketBox');
+    $$('[data-play]',box).forEach(b=>b.onclick=()=>this.startTie(b.dataset.play,'play'));
+    $$('[data-sim]',box).forEach(b=>b.onclick=()=>this.startTie(b.dataset.sim,'sim'));
+    $$('[data-watch]',box).forEach(b=>b.onclick=()=>this.startTie(b.dataset.watch,'watch'));
+    // drag to rearrange matchups
+    let from=null;
+    $$('.tteam[draggable=true]',box).forEach(el=>{
+      el.addEventListener('dragstart',e=>{from=el.dataset.loc;e.dataTransfer.effectAllowed='move';});
+      el.addEventListener('dragover',e=>{e.preventDefault();el.classList.add('dragover');});
+      el.addEventListener('dragleave',()=>el.classList.remove('dragover'));
+      el.addEventListener('drop',e=>{e.preventDefault();el.classList.remove('dragover');const to=el.dataset.loc;
+        if(!from||from===to)return; this.swapSlots(from,to); });
+    });
+  },
+  swapSlots(from,to){
+    const T=this.tournament; const p=s=>s.split('|').map(x=>+x);
+    const [rf,tf,sf]=p(from),[rt,tt,st]=p(to);
+    const tieF=T.rounds[rf].ties[tf], tieT=T.rounds[rt].ties[tt];
+    if(tieF.result||tieT.result)return;
+    const kf=sf===0?'a':'b',kt=st===0?'a':'b';
+    const tmp=tieF[kf];tieF[kf]=tieT[kt];tieT[kt]=tmp; this.renderTournament();
+  },
+  drawLines(){
+    const wrap=$('#bracketBox .bracket'); if(!wrap)return;
+    let svg=wrap.querySelector('#brl'); if(!svg){svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.id='brl';
+      Object.assign(svg.style,{position:'absolute',left:0,top:0,pointerEvents:'none',zIndex:0,overflow:'visible'});wrap.prepend(svg);}
+    const T=this.tournament,wr=wrap.getBoundingClientRect(),ox=wr.left-wrap.scrollLeft,oy=wr.top-wrap.scrollTop,paths=[];
+    for(let ri=0;ri<T.rounds.length-1;ri++){
+      wrap.querySelectorAll(`.tie[data-node^="${ri}|"]`).forEach(node=>{
+        const ti=+node.dataset.node.split('|')[1], target=wrap.querySelector(`.tie[data-node="${ri+1}|${Math.floor(ti/2)}"]`);
+        if(!target)return; const a=node.getBoundingClientRect(),b=target.getBoundingClientRect();
+        const x1=a.right-ox,y1=a.top+a.height/2-oy,x2=b.left-ox,y2=b.top+b.height/2-oy,mx=(x1+x2)/2;
+        paths.push(`M${x1} ${y1} H${mx} V${y2} H${x2}`);});}
+    svg.setAttribute('width',wrap.scrollWidth);svg.setAttribute('height',wrap.scrollHeight);
+    svg.style.width=wrap.scrollWidth+'px';svg.style.height=wrap.scrollHeight+'px';
+    svg.innerHTML=paths.map(d=>`<path d="${d}" fill="none" stroke="#3a4d78" stroke-width="2"/>`).join('');
+  },
+  simRound(){
+    const T=this.tournament; if(!T.champion){const r=T.currentRound();
+      r.ties.forEach(tie=>{if(!tie.result&&tie.a&&tie.b){T.recordResult(tie,SimEngine.simulate(tie.a,tie.b,true));}});
+      if(T.third&&!T.third.result&&T.champion){T.recordResult(T.third,SimEngine.simulate(T.third.a,T.third.b,true));}
+    }
+    this.renderTournament();
+  },
+  startTie(loc,mode){
+    const T=this.tournament,[ri,ti]=loc.split('|').map(x=>+x);
+    const tie=(ri==='third'||isNaN(ri))?T.third:T.rounds[ri].ties[ti]; // third handled separately below
+    const realTie=T.rounds[ri]?T.rounds[ri].ties[ti]:T.third;
+    const useTie=realTie;
+    if(mode==='sim'){ T.recordResult(useTie,SimEngine.simulate(useTie.a,useTie.b,true)); this.renderTournament(); return; }
+    // live match (play or watch)
+    this.pendingTie=useTie;
+    this.startMatch(useTie.a,useTie.b,{minutes:T.opt.minutes,knockout:true,userControl:mode==='play',userTeam:0,diff:1});
+  },
+  /* ---------- Match lifecycle ---------- */
+  startMatch(A,B,opt){
+    this.input.clear();
+    this.match=new Match(A,B,opt);
+    $('#hudA').textContent=A.name; $('#hudB').textContent=B.name;
+    $('#possA').style.background=A.c1; $('#possB').style.background=B.c1;
+    this.updateHUD(this.match);
+    $$('.screen').forEach(s=>s.classList.remove('active'));
+    $('#gameScreen').classList.add('active');
+    $('#pauseBtn').onclick=()=>this.togglePause();
+    this.removeOverlay();
+  },
+  bindMenus(){
+    $('#psStart').onclick=()=>{const a=+$('#psTeamA').value,b=+$('#psTeamB').value;
+      if(a===b){alert('Pick two different teams');return;}
+      this.startMatch(this.teams[a],this.teams[b],{minutes:+$('#psLen').value,diff:+$('#psDiff').value,
+        userControl:$('#psControl').value==='1',userTeam:0,knockout:false}); };
+    // settings
+    $('#setNames').onchange=e=>this.settings.names=e.target.checked;
+    $('#setArrow').onchange=e=>this.settings.arrow=e.target.checked;
+    $('#setShake').onchange=e=>this.settings.shake=e.target.checked;
+    $('#setZoom').oninput=e=>this.zoom=+e.target.value;
+  },
+  togglePause(){ if(!this.match||this.match.over)return; this.match.paused=!this.match.paused;
+    if(this.match.paused)this.showPause(); else this.removeOverlay(); },
+  showPause(){
+    this.removeOverlay();
+    const o=document.createElement('div');o.className='overlay';o.id='ov';
+    o.innerHTML=`<div class="card" style="text-align:center"><h2>⏸ Paused</h2>
+      <div class="row" style="justify-content:center;margin-top:10px">
+        <button class="btn" id="ovResume">▶️ Resume</button>
+        <button class="btn sec" id="ovQuit">🚪 Quit match</button></div></div>`;
+    document.body.appendChild(o);
+    $('#ovResume').onclick=()=>this.togglePause();
+    $('#ovQuit').onclick=()=>{this.quitMatch();};
+  },
+  removeOverlay(){const o=$('#ov');if(o)o.remove();},
+  quitMatch(){cancelMatch();this.removeOverlay(); this.show(this.pendingTie?'tour':'menu'); },
+  onMatchEnd(m){
+    this.updateHUD(m); this.removeOverlay();
+    const r=m.result; const A=m.teams[0],B=m.teams[1];
+    let sub= r.shootout?`After penalties: ${r.shootout[0]}–${r.shootout[1]}`:'';
+    const scorers=r.scorers.length?r.scorers.sort((a,b)=>a.min-b.min).map(g=>`${g.min}' ${g.name} <span class="mini">(${g.team?B.name:A.name})</span>`).join('<br>'):'<span class="mini">No goals</span>';
+    const o=document.createElement('div');o.className='overlay';o.id='ov';
+    o.innerHTML=`<div class="card">
+      <h2 style="text-align:center">Full Time</h2>
+      <div style="text-align:center;font-size:2rem;font-weight:900;margin:6px 0">${A} ${r.score[0]} – ${r.score[1]} ${B}</div>
+      <div class="mini" style="text-align:center">${sub}</div>
+      <div class="grid2" style="margin-top:14px">
+        <div><div class="mini">⚽ Goals</div>${scorers}</div>
+        <div><div class="mini">📊 Stats</div>
+          <table>
+          <tr><td>Possession</td><td>${r.possession[0]}%</td><td>${r.possession[1]}%</td></tr>
+          <tr><td>Shots</td><td>${r.shots[0]}</td><td>${r.shots[1]}</td></tr>
+          <tr><td>On target</td><td>${r.sot[0]}</td><td>${r.sot[1]}</td></tr>
+          <tr><td>Corners</td><td>${r.corners[0]}</td><td>${r.corners[1]}</td></tr>
+          <tr><td>Yellow</td><td>${r.yellow[0]}</td><td>${r.yellow[1]}</td></tr>
+          <tr><td>Red</td><td>${r.red[0]}</td><td>${r.red[1]}</td></tr>
+          </table>
+          <div class="pill" style="margin-top:8px">⭐ MOTM: <b>${r.motm}</b></div>
+        </div>
+      </div>
+      <div class="row" style="justify-content:center;margin-top:16px">
+        ${this.pendingTie?`<button class="btn" id="ovCont">🏆 Back to bracket</button>`:`<button class="btn" id="ovAgain">🔁 Rematch</button><button class="btn sec" id="ovMenu">Menu</button>`}
+      </div></div>`;
+    document.body.appendChild(o);
+    if(this.pendingTie){
+      const tie=this.pendingTie; this.tournament.recordResult(tie,r); this.pendingTie=null;
+      $('#ovCont').onclick=()=>{cancelMatch();this.removeOverlay();this.show('tour');};
+    } else {
+      $('#ovAgain').onclick=()=>{const opt=this.match.opt;const A2=this.match.teams[0],B2=this.match.teams[1];cancelMatch();this.removeOverlay();this.startMatch(A2,B2,opt);};
+      $('#ovMenu').onclick=()=>{cancelMatch();this.removeOverlay();this.show('menu');};
+    }
+  },
+  updateHUD(m){ $('#hudScore').textContent=`${m.score[0]} - ${m.score[1]}`;
+    const total=m.possFrames[0]+m.possFrames[1]||1;const pa=Math.round(m.possFrames[0]/total*100);
+    $('#possA').style.width=pa+'%';$('#possB').style.width=(100-pa)+'%'; },
+  loop(ts){
+    requestAnimationFrame(this.loop);
+    const dt=Math.min(0.05,(ts-this.last)/1000||0); this.last=ts;
+    const m=this.match; if(!m){return;}
+    if(!m.paused&&!m.over){ m.update(dt,this.input);
+      // HUD clock
+      const rem=Math.max(0,m.duration-m.time); const shown=m.time/m.duration*90;
+      $('#hudClock').textContent=`${String(Math.floor(shown)).padStart(2,'0')}'`;
+      $('#hudHalf').textContent = m.time< m.duration/2?'1st half':'2nd half';
+      this.updateHUD(m);
+    }
+    Game.renderer.draw(m,this.zoom);
+  }
+};
+function cancelMatch(){ Game.match=null; }
+
+Game.init();
+</script>
+</body>
+</html>
