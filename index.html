@@ -95,6 +95,45 @@
   .tie .side{display:flex;justify-content:space-between;padding:8px 10px;font-size:.86rem;gap:8px}
   .tie .side.win{background:rgba(56,224,123,.12);font-weight:700}
   .tie .side+.side{border-top:1px solid var(--line)}
+  /* ---- player edit boxes (draggable) ---- */
+  .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:10px}
+  .pbox{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 10px 12px;position:relative;transition:.12s}
+  .pbox.dragover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
+  .pbox.dragging{opacity:.4}
+  .pbox .slotno{position:absolute;top:8px;right:10px;font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .pbox .rm{position:absolute;top:4px;left:6px;background:none;border:none;color:var(--red);cursor:pointer;font-size:.85rem;padding:2px 5px}
+  .pbox label{margin:7px 0 2px;font-size:.68rem}
+  .pbox input,.pbox select{padding:6px 8px;font-size:.85rem}
+  .grip{cursor:grab;color:var(--muted);text-align:center;font-weight:700;letter-spacing:3px;user-select:none;padding:2px 0 4px}
+  .grip:active{cursor:grabbing}
+  /* ---- match vs badge ---- */
+  .match-setup{display:grid;grid-template-columns:1fr 64px 1fr;gap:12px;align-items:end}
+  @media(max-width:600px){.match-setup{grid-template-columns:1fr}}
+  .vs-badge{display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.05rem;
+    color:var(--gold);background:var(--panel2);border:2px solid var(--gold);border-radius:50%;width:60px;height:60px;margin:0 auto}
+  /* ---- interactive shootout ---- */
+  .pk-scoreline{font-size:2rem;font-weight:900;text-align:center;letter-spacing:2px}
+  .pk-board{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+  .pk-team{text-align:center}
+  .pk-track{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+  .pk-dot{width:24px;height:24px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:.85rem;background:var(--panel)}
+  .pk-dot.goal{background:var(--accent);color:#06210f;border-color:var(--accent)}
+  .pk-dot.miss{background:#3a1620;color:var(--red);border-color:#5b2430}
+  .pk-now{text-align:center;margin:16px 0 6px;padding:11px;border:1px solid var(--accent);border-radius:12px;background:rgba(56,224,123,.07)}
+  .pk-now .who{font-size:1.15rem;font-weight:800}
+  .pk-picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:12px}
+  .pk-pick{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 10px;cursor:pointer;text-align:left;color:var(--text);transition:.12s}
+  .pk-pick:hover{border-color:var(--accent)}
+  .pk-pick b{display:block}
+  .pk-pick .team-tag{display:block;font-size:.68rem;color:var(--muted);margin-top:3px}
+  .pk-result{text-align:center;font-size:1.2rem;font-weight:800;margin:14px 0}
+  /* ---- bracket draggable team boxes ---- */
+  .bteam{display:flex;align-items:center;gap:7px;flex:1;min-width:0}
+  .bteam[draggable=true]{cursor:grab}
+  .bteam[draggable=true]:active{cursor:grabbing}
+  .bteam.dragover{outline:2px dashed var(--accent);outline-offset:2px;border-radius:6px}
+  .bteam .bnm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bteam .bov{margin-left:6px;font-weight:800;color:var(--accent);font-size:.82rem}
   .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
     background:var(--panel2);border:1px solid var(--accent);color:var(--text);
     padding:11px 18px;border-radius:12px;box-shadow:var(--shadow);z-index:99;opacity:0;
@@ -931,12 +970,14 @@ const UI={
     const t=team||new Team({name:'',flag:'🏳️',players:[],subs:[]});
     if(!editing) DB.draftPlayers=[]; else DB.draftPlayers=[...t.players,...t.subs].map(p=>({p,sub:t.subs.includes(p)}));
     const el=$('#teamEditor');
+    const esc=s=>String(s).replace(/"/g,'&quot;');
+    const reroll=x=>{x.p.stats=Player.rollStats(x.p.overall,x.p.position,x.p.signature);};
     const render=()=>{
       el.innerHTML=`<div class="card">
         <h2>${editing?'✏️ Edit team':'➕ New team'}</h2>
         <div class="grid g2">
-          <div><label>Team name</label><input id="tname" value="${t.name}"></div>
-          <div><label>Flag (emoji)</label><input id="tflag" value="${t.flag}" maxlength="4"></div>
+          <div><label>Team name</label><input id="tname" value="${esc(t.name)}"></div>
+          <div><label>Flag (emoji)</label><input id="tflag" value="${esc(t.flag)}" maxlength="4"></div>
         </div>
         <h3 style="margin-top:16px">Add player</h3>
         <div class="grid g3">
@@ -955,23 +996,47 @@ const UI={
         <div class="row" style="margin-top:14px">
           <button class="btn" id="saveTeam">💾 Save team</button>
           <button class="btn sec" id="cancelTeam">Cancel</button>
-          <span class="mini">Need 11 starters (1 GK recommended).</span>
+          <span class="mini">Aim for 11 starters (1 GK recommended). Drag boxes to swap slots.</span>
         </div>
+      </div>`;
+      // one editable, draggable box per player
+      const box=(x,i)=>`<div class="pbox" draggable="true" data-idx="${i}">
+        <button class="rm" data-rm="${i}" title="remove">✕</button>
+        <span class="slotno">${x.sub?'sub':'starter'}</span>
+        <div class="grip">⠿⠿⠿</div>
+        <label>Name</label><input class="f-name" data-i="${i}" value="${esc(x.p.name)}">
+        <label>Position</label><select class="f-pos" data-i="${i}">${POSITIONS.map(p=>`<option ${p===x.p.position?'selected':''}>${p}</option>`).join('')}</select>
+        <label>Overall (stat)</label><input class="f-ov" data-i="${i}" type="number" min="1" max="100" value="${x.p.overall}">
+        <label>Signature (=100)</label><select class="f-sig" data-i="${i}">${SIGNATURE_STATS.map(s=>`<option ${s===x.p.signature?'selected':''}>${s}</option>`).join('')}</select>
       </div>`;
       const draft=()=>{
         const dl=$('#draftList');
-        const starters=DB.draftPlayers.filter(x=>!x.sub);
-        const subs=DB.draftPlayers.filter(x=>x.sub);
-        const row=(x,i)=>`<tr><td><span class="tag ${x.p.position}">${x.p.position}</span></td>
-          <td>${x.p.name}</td><td class="rating ${ratingClass(x.p.overall)}">${x.p.overall}</td>
-          <td class="sig">${x.p.signature}</td>
-          <td><button class="btn sec" data-rm="${i}" style="padding:3px 8px">✕</button></td></tr>`;
-        dl.innerHTML=`<table style="margin-top:12px"><tr><th>Pos</th><th>Name</th><th>OVR</th><th>Signature</th><th></th></tr>
-          <tr><td colspan="5" class="mini">Starters (${starters.length}/11)</td></tr>
-          ${DB.draftPlayers.map((x,i)=>x.sub?'':row(x,i)).join('')}
-          ${subs.length?`<tr><td colspan="5" class="mini">Substitutes (${subs.length})</td></tr>`:''}
-          ${DB.draftPlayers.map((x,i)=>x.sub?row(x,i):'').join('')}</table>`;
+        const nStart=DB.draftPlayers.filter(x=>!x.sub).length;
+        const nSub=DB.draftPlayers.filter(x=>x.sub).length;
+        dl.innerHTML=`
+          <div class="mini" style="margin-top:14px">Starting XI (${nStart}/11) — drag a box onto another to swap slots</div>
+          <div class="pgrid">${DB.draftPlayers.map((x,i)=>x.sub?'':box(x,i)).join('')||'<div class="empty">No starters yet</div>'}</div>
+          ${nSub?`<div class="mini" style="margin-top:14px">Substitutes (${nSub})</div>
+            <div class="pgrid">${DB.draftPlayers.map((x,i)=>x.sub?box(x,i):'').join('')}</div>`:''}`;
+        // field edits (silent re-roll of derived stats; signature stays 100)
+        $$('.f-name',dl).forEach(inp=>inp.onchange=()=>{DB.draftPlayers[+inp.dataset.i].p.name=inp.value;});
+        $$('.f-pos',dl).forEach(s=>s.onchange=()=>{const x=DB.draftPlayers[+s.dataset.i];x.p.position=s.value;reroll(x);});
+        $$('.f-ov',dl).forEach(inp=>inp.onchange=()=>{const x=DB.draftPlayers[+inp.dataset.i];x.p.overall=clamp(+inp.value||70);inp.value=x.p.overall;reroll(x);});
+        $$('.f-sig',dl).forEach(s=>s.onchange=()=>{const x=DB.draftPlayers[+s.dataset.i];x.p.signature=s.value;reroll(x);});
         $$('[data-rm]',dl).forEach(b=>b.onclick=()=>{DB.draftPlayers.splice(+b.dataset.rm,1);draft();});
+        // drag-to-swap
+        let from=null;
+        $$('.pbox',dl).forEach(bx=>{
+          bx.addEventListener('dragstart',e=>{from=+bx.dataset.idx;bx.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
+          bx.addEventListener('dragend',()=>{bx.classList.remove('dragging');$$('.pbox',dl).forEach(b=>b.classList.remove('dragover'));});
+          bx.addEventListener('dragover',e=>{e.preventDefault();bx.classList.add('dragover');});
+          bx.addEventListener('dragleave',()=>bx.classList.remove('dragover'));
+          bx.addEventListener('drop',e=>{e.preventDefault();const to=+bx.dataset.idx;
+            if(from===null||from===to)return;
+            const arr=DB.draftPlayers,a=arr[from],b=arr[to],sa=a.sub,sb=b.sub;
+            arr[from]=b;arr[to]=a;arr[from].sub=sa;arr[to].sub=sb; // players trade slots, slot keeps its role
+            draft();});
+        });
       };
       draft();
       $('#addPlayer').onclick=()=>{
@@ -980,7 +1045,6 @@ const UI={
         const p=new Player({name,position:$('#ppos').value,overall:ov,signature:$('#psig').value});
         DB.draftPlayers.push({p,sub:$('#pissub').checked});
         $('#pname').value='';draft();
-        // live preview of generated stats
         toast(`Added ${name} — ${p.signature}=100`);
       };
       $('#cancelTeam').onclick=()=>{el.innerHTML='';};
@@ -1008,8 +1072,9 @@ const UI={
     const opts=DB.teams.map(t=>`<option value="${t.id}">${t.flag} ${t.name} (${t.overall})</option>`).join('');
     v.innerHTML=`<div class="card">
       <h2>⚽ Exhibition Match</h2>
-      <div class="grid g2">
+      <div class="match-setup">
         <div><label>Team A (home)</label><select id="mA">${opts}</select></div>
+        <div class="vs-badge">V.S.</div>
         <div><label>Team B (away)</label><select id="mB">${opts}</select></div>
       </div>
       <div class="row" style="margin-top:12px">
@@ -1019,19 +1084,91 @@ const UI={
       </div>
       <div class="row" style="margin-top:14px">
         <button class="btn" id="simBtn">▶️ Simulate Match</button>
+        <button class="btn sec" id="shootBtn">🥅 Penalty shootout only</button>
       </div>
+      <p class="mini">Shootout only: take it one kick at a time — you pick who steps up for each penalty.</p>
     </div>
     <div id="matchReport"></div>`;
     $('#mB').selectedIndex=Math.min(1,DB.teams.length-1);
-    $('#simBtn').onclick=()=>{
+    const selected=()=>{
       const a=DB.teams.find(t=>t.id===$('#mA').value);
       const b=DB.teams.find(t=>t.id===$('#mB').value);
-      if(a.id===b.id){toast('Pick two different teams');return;}
-      const rep=MatchEngine.simulate(a,b,{extraTime:$('#oET').checked,penalties:$('#oPen').checked,
+      if(a.id===b.id){toast('Pick two different teams');return null;}
+      return [a,b];
+    };
+    $('#simBtn').onclick=()=>{
+      const s=selected();if(!s)return;
+      const rep=MatchEngine.simulate(s[0],s[1],{extraTime:$('#oET').checked,penalties:$('#oPen').checked,
         homeAdvantage:$('#oHome').checked});
       DB.lastReport=rep;
       this.showMatchReport(rep,'#matchReport');
     };
+    $('#shootBtn').onclick=()=>{const s=selected();if(!s)return;this.startShootout(s[0],s[1]);};
+  },
+
+  /* --------- interactive penalty shootout (pick a kicker per shot) -------- */
+  startShootout(A,B){
+    const teams=[A,B];
+    const gk=[A.players.find(p=>p.position==='GK'),B.players.find(p=>p.position==='GK')];
+    const used=[new Set(),new Set()];       // ids that have already kicked this cycle
+    const results=[[],[]];                    // {name,scored,ov}
+    let turn=0, decided=false, winner=null;
+    const score=side=>results[side].filter(r=>r.scored).length;
+    const eligible=side=>{
+      const pool=teams[side].squad.filter(p=>!used[side].has(p.id));
+      if(pool.length) return pool;
+      used[side].clear();                     // sudden death: everyone eligible again
+      return teams[side].squad.slice();
+    };
+    const checkDecided=()=>{
+      const sA=score(0),sB=score(1),tA=results[0].length,tB=results[1].length;
+      const remA=Math.max(0,5-tA),remB=Math.max(0,5-tB);
+      if(sA>sB+remB){winner=0;decided=true;}
+      else if(sB>sA+remA){winner=1;decided=true;}
+      else if(tA>=5&&tB>=5&&tA===tB&&sA!==sB){winner=sA>sB?0:1;decided=true;}
+    };
+    const kick=(side,player)=>{
+      used[side].add(player.id);
+      const g=gk[1-side];
+      const prob=clamp((player.stats['Penalties']-(g?g.stats['Goalkeeping']:55)*.5+35)/100,.4,.92);
+      const scored=Math.random()<prob;
+      results[side].push({name:player.name,scored,ov:player.overall});
+      checkDecided();
+      turn=1-side;
+      render(scored?`⚽ GOAL — ${player.name} scores!`:(g&&Math.random()<.5?`🧤 SAVED! ${g.name} denies ${player.name}.`:`❌ MISSED! ${player.name} puts it wide.`));
+    };
+    const el=$('#matchReport');
+    const dot=r=>`<div class="pk-dot ${r.scored?'goal':'miss'}">${r.scored?'⚽':'✕'}</div>`;
+    const render=(msg='')=>{
+      const track=side=>`<div class="pk-team"><div class="flag" style="font-size:1.8rem">${teams[side].flag}</div>
+        <b>${teams[side].name}</b><div class="pk-track">${results[side].map(dot).join('')||'<span class="mini muted">no kicks yet</span>'}</div></div>`;
+      let body;
+      if(decided){
+        body=`<div class="pk-result">🏆 ${teams[winner].flag} ${teams[winner].name} win the shootout ${score(winner)}–${score(1-winner)}!</div>
+          <div class="row" style="justify-content:center"><button class="btn" id="pkAgain">🔁 New shootout</button></div>`;
+      }else{
+        const picks=eligible(turn).map(p=>`<button class="pk-pick" data-pid="${p.id}">
+            <b>${p.name}</b><span class="mini">${p.position} · OVR ${p.overall} · Pen ${p.stats['Penalties']}</span>
+            <span class="team-tag">${teams[turn].flag} ${teams[turn].name}</span></button>`).join('');
+        body=`<div class="pk-now"><div class="mini">Now kicking for</div>
+            <div class="who">${teams[turn].flag} ${teams[turn].name}</div>
+            <div class="mini">Choose who steps up (kick ${results[turn].length+1})</div></div>
+          <div class="pk-picks">${picks}</div>`;
+      }
+      el.innerHTML=`<div class="card">
+        <h3>🥅 Penalty Shootout</h3>
+        <div class="pk-scoreline">${A.flag} ${score(0)} <span style="opacity:.4">-</span> ${score(1)} ${B.flag}</div>
+        ${msg?`<div class="pk-result">${msg}</div>`:''}
+        <div class="pk-board">${track(0)}${track(1)}</div>
+        ${body}
+      </div>`;
+      if(decided){$('#pkAgain').onclick=()=>this.startShootout(A,B);}
+      else $$('.pk-pick',el).forEach(b=>b.onclick=()=>{
+        const p=teams[turn].squad.find(x=>x.id===b.dataset.pid);kick(turn,p);
+      });
+    };
+    render();
+    el.scrollIntoView({behavior:'smooth',block:'start'});
   },
 
   showMatchReport(rep,target){
@@ -1157,27 +1294,56 @@ const UI={
   renderBracket(){
     const T=DB.tournament,box=$('#bracketBox');
     const ko=T.knockout;
-    const rounds=[];
-    const roundView=(title,ties)=>{
+    const roundView=(title,ties,key)=>{
       if(!ties||!ties.length||!ties[0])return '';
-      return `<div class="round"><h4>${title}</h4>${ties.filter(Boolean).map(m=>this.tieView(m)).join('')}</div>`;
+      return `<div class="round"><h4>${title}</h4>${ties.map((m,i)=>this.tieView(m,`${key}|${i}`)).filter(Boolean).join('')}</div>`;
     };
-    let html=roundView('Round of 16',ko.R16)+roundView('Quarterfinals',ko.QF)+roundView('Semifinals',ko.SF);
-    if(ko.final)html+=`<div class="round"><h4>Final</h4>${this.tieView(ko.final)}
-      ${ko.third?`<h4 style="margin-top:14px">3rd place</h4>${this.tieView(ko.third)}`:''}</div>`;
+    let html=roundView('Round of 16',ko.R16,'R16')+roundView('Quarterfinals',ko.QF,'QF')+roundView('Semifinals',ko.SF,'SF');
+    if(ko.final)html+=`<div class="round"><h4>Final</h4>${this.tieView(ko.final,'final|0')}
+      ${ko.third?`<h4 style="margin-top:14px">3rd place</h4>${this.tieView(ko.third,'third|0')}`:''}</div>`;
     if(!html){box.innerHTML='';return;}
-    box.innerHTML=`<div class="card"><h3>🗺 Knockout bracket</h3><div class="bracket">${html}</div></div>`;
+    box.innerHTML=`<div class="card"><h3>🗺 Knockout bracket</h3>
+      <p class="mini">Drag a team box onto another (in unplayed ties) to re-seed the bracket before you play the round.</p>
+      <div class="bracket">${html}</div></div>`;
+    this.wireBracketDrag();
   },
-  tieView(m){
+  tieView(m,loc){
     if(!m)return'';
     const played=m.played&&m.report;
     const s=played?m.report.score:[null,null];
     const so=played&&m.report.shootout?m.report.shootout.score:null;
     const winA=played&&(s[0]>s[1]||(so&&so[0]>so[1]));
     const winB=played&&(s[1]>s[0]||(so&&so[1]>so[0]));
-    const side=(t,sc,win)=>`<div class="side ${win?'win':''}">
-      <span>${t?t.flag+' '+t.name:'TBD'}</span><span>${sc!==null?sc:''}${win&&so?` (${so[t===m.a?0:1]})`:''}</span></div>`;
-    return `<div class="tie">${side(m.a,s[0],winA)}${side(m.b,s[1],winB)}</div>`;
+    // each team is a draggable box with flag, name and overall
+    const box=(t,side)=>`<div class="bteam" ${(!played&&t)?`draggable="true" data-loc="${loc}|${side}"`:''}>
+        <span class="flag">${t?t.flag:''}</span>
+        <span class="bnm">${t?t.name:'TBD'}</span>
+        ${t?`<span class="bov">${t.overall}</span>`:''}</div>`;
+    const side=(t,sc,win,idx)=>`<div class="side ${win?'win':''}">
+      ${box(t,idx)}<span style="padding-left:6px">${sc!==null?sc:''}${win&&so?` (${so[idx]})`:''}</span></div>`;
+    return `<div class="tie">${side(m.a,s[0],winA,0)}${side(m.b,s[1],winB,1)}</div>`;
+  },
+  // resolve a "round|idx|side" location to its tie object + side key
+  bracketSlot(loc){
+    const [r,i]=loc.split('|');const T=DB.tournament,ko=T.knockout;
+    if(r==='final')return ko.final; if(r==='third')return ko.third;
+    return ko[r]&&ko[r][+i];
+  },
+  wireBracketDrag(){
+    const box=$('#bracketBox');let from=null;
+    $$('.bteam[draggable=true]',box).forEach(bt=>{
+      bt.addEventListener('dragstart',e=>{from=bt.dataset.loc;e.dataTransfer.effectAllowed='move';});
+      bt.addEventListener('dragover',e=>{e.preventDefault();bt.classList.add('dragover');});
+      bt.addEventListener('dragleave',()=>bt.classList.remove('dragover'));
+      bt.addEventListener('drop',e=>{e.preventDefault();bt.classList.remove('dragover');
+        const to=bt.dataset.loc;if(!from||from===to)return;
+        const pf=from.split('|'),pt=to.split('|');
+        const tieF=this.bracketSlot(from),tieT=this.bracketSlot(to);
+        if(!tieF||!tieT||tieF.played||tieT.played)return;
+        const kf=pf[2]==='0'?'a':'b',kt=pt[2]==='0'?'a':'b';
+        const tmp=tieF[kf];tieF[kf]=tieT[kt];tieT[kt]=tmp; // swap the two teams
+        this.renderTournament();toast('🔀 Bracket re-seeded');});
+    });
   },
 
   /* ----------------------------- STATS TAB -------------------------- */
