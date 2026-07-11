@@ -347,6 +347,7 @@ class Renderer{
     ctx.save();
     ctx.translate(this.vw/2,this.vh/2); ctx.scale(zoom,zoom); ctx.translate(-this.cam.x,-this.cam.y);
     this.field(ctx,m);
+    this.aimOverlay(ctx,m);
     // fielders
     for(const f of m.fielders) this.person(ctx,f,m.fieldTeam,'field');
     // runners
@@ -388,6 +389,24 @@ class Renderer{
     ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(F.HOME.x-8,F.HOME.y-6);ctx.lineTo(F.HOME.x+8,F.HOME.y-6);ctx.lineTo(F.HOME.x+8,F.HOME.y+2);ctx.lineTo(F.HOME.x,F.HOME.y+9);ctx.lineTo(F.HOME.x-8,F.HOME.y+2);ctx.closePath();ctx.fill();
     // batter's box + strike zone hint near plate
     ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1.5;ctx.strokeRect(F.HOME.x-30,F.PLATE_Y-24,20,48);ctx.strokeRect(F.HOME.x+10,F.PLATE_Y-24,20,48);
+  }
+  // strike-zone box + aim reticle so pitching isn't blind
+  aimOverlay(ctx,m){
+    const zx0=F.HOME.x, zy0=F.PLATE_Y, halfX=0.9*26, halfY=0.9*20;
+    ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=1.5;ctx.setLineDash([4,3]);
+    ctx.strokeRect(zx0-halfX,zy0-halfY,halfX*2,halfY*2);ctx.setLineDash([]);
+    const userPitch = m.userControl && m.userTeam===(1-m.half);
+    if(userPitch && m.phase==='setpitch'){
+      const a=m.pitchAim||{zx:0,zy:0,type:'fastball'};
+      const rx=zx0+a.zx*26, ry=zy0+a.zy*20, inZone=Math.abs(a.zx)<0.9&&Math.abs(a.zy)<0.9;
+      ctx.strokeStyle=inZone?'#39c07b':'#f5a623';ctx.lineWidth=2.2;
+      ctx.beginPath();ctx.arc(rx,ry,6,0,7);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(rx-10,ry);ctx.lineTo(rx+10,ry);ctx.moveTo(rx,ry-10);ctx.lineTo(rx,ry+10);ctx.stroke();
+      ctx.fillStyle='#fff';ctx.font='bold 12px Arial';ctx.textAlign='center';
+      ctx.fillText((a.type||'fastball').toUpperCase()+'  —  SPACE to throw', F.MOUND.x, F.MOUND.y-38);
+      ctx.font='8px Arial';ctx.fillStyle='rgba(255,255,255,.8)';
+      ctx.fillText('arrows aim  ·  1 fast  2 curve  3 slider  4 change  ·  Shift = max velo', F.MOUND.x, F.MOUND.y-26);
+    }
   }
   // sprite: cap, jersey(number), pants, cleats, + bat or glove
   person(ctx,s,team,kind){
@@ -453,6 +472,7 @@ class Match{
     this.ball=new Ball(); this.ball.hide=true; this.ball.inPlay=false;
     this.msgT=0; this.paused=false; this.over=false;
     this.phase='setpitch'; this.phaseT=0; this.pitch=null; this.swung=false; this.aim=0; this.speed=Game.gameSpeed||0.85;
+    this.pitchAim={zx:0,zy:0,type:'fastball'};
     this.lineScore=[[],[]];                     // runs per inning
     this.box=[this._box(),this._box()];
     this.bat={};                                // per-player batting: name -> {ab,h,hr,rbi,bb,k,team}
@@ -505,7 +525,7 @@ class Match{
     if(this.userIsPitching()){
       // user aims with arrows, picks type with 1-4, throws with space
       this.pitchAim=this.pitchAim||{zx:0,zy:0,type:'fastball'};
-      const a=this.pitchAim,k=input.k,sp=0.03;
+      const a=this.pitchAim,k=input.k,sp=0.045;
       if(k['arrowleft'])a.zx-=sp; if(k['arrowright'])a.zx+=sp;
       if(k['arrowup'])a.zy-=sp; if(k['arrowdown'])a.zy+=sp;
       a.zx=clamp(a.zx,-1.6,1.6);a.zy=clamp(a.zy,-1.5,1.5);
@@ -538,9 +558,9 @@ class Match{
     const pt=this.pitch; pt.t+=g;
     const f=clamp(pt.t/pt.dur,0,1);
     // path from mound to plate, with lateral break increasing late
-    const startX=F.MOUND.x, plateX=F.HOME.x + pt.zx*20;
+    const startX=F.MOUND.x, plateX=F.HOME.x + pt.zx*26;
     const bx = lerp(startX,plateX,f) + Math.sin(f*Math.PI)*pt.breakAmt*38*(pt.type==='curveball'?1:-1);
-    const by = lerp(F.MOUND.y,F.PLATE_Y + pt.zy*10, f);
+    const by = lerp(F.MOUND.y,F.PLATE_Y + pt.zy*20, f);
     this.ball.x=bx; this.ball.y=by; this.ball.spin+=g*20;
     // user swing
     if(this.userIsBatting()){
@@ -569,7 +589,7 @@ class Match{
   swingMiss(){ this.count.strikes++; this.showMsg('Swing & miss!',700);
     if(this.count.strikes>=3) this.strikeout(); else this.phaseEnd(); }
   foul(){ if(this.count.strikes<2)this.count.strikes++; this.showMsg('Foul ball',600); this.phaseEnd(); }
-  calledPitch(){ const pt=this.pitch; const isStrike=Math.abs(pt.zx)<0.85 && Math.abs(pt.zy)<0.85;
+  calledPitch(){ const pt=this.pitch; const isStrike=Math.abs(pt.zx)<0.9 && Math.abs(pt.zy)<0.9;
     if(isStrike){ this.count.strikes++; this.showMsg('Strike!',600);
       if(this.count.strikes>=3)this.strikeout(); else this.phaseEnd(); }
     else { this.count.balls++; this.showMsg('Ball',500);
@@ -1016,7 +1036,12 @@ const Game={
   updateHUD(m){$('#hudScore').textContent=`${m.score[0]} - ${m.score[1]}`;
     $('#hudInn').textContent=(m.half===0?'▲ ':'▼ ')+m.inning;
     $('#cB').textContent=m.count.balls;$('#cS').textContent=m.count.strikes;$('#cO').textContent=m.outs;
-    $('#cPC').textContent='P: '+(m.count.pc||0);},
+    $('#cPC').textContent='P: '+(m.count.pc||0);
+    if(m.userControl){ const pitching=m.userTeam===(1-m.half);
+      $('#keyhint').textContent = pitching
+        ? '⚾ YOU PITCH: arrows aim (green = strike) · 1-4 pitch type · Space throw · Shift max velo'
+        : '🏏 YOU BAT: ← → aim · Space swing · Shift power swing · E bunt'; }
+    else $('#keyhint').textContent='Watching CPU vs CPU — press ⏸ to exit.';},
   loop(ts){requestAnimationFrame(this.loop);const dt=Math.min(0.05,(ts-this.last)/1000||0);this.last=ts;
     const m=this.match;if(!m)return;
     if(!m.paused&&!m.over){m.update(dt,this.input);this.updateHUD(m);}
