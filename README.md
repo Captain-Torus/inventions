@@ -4,6 +4,15 @@ Two self-contained apps, each a **single HTML file** — no frameworks, no build
 
 - **`index.html`** — the World Cup **Simulator** (create teams, simulate matches & tournaments, stats, save/load). Details below.
 - **`game.html`** — a playable **2D arcade soccer game** with real-time controls, AI, ball physics, hand-drawn player sprites, and its own tournament mode. Open it and pick *Play Match* or *Tournament Mode*.
+- **`baseball.html`** — a playable **2D arcade baseball game**. You bat and pitch (fielding & base-running are automatic); full stadium, sprites, HUD, exhibition (3/6/9 innings + extra innings), team creator, and a tournament mode (4/8/16/32 teams, drag bracket, Play / Simulate / Watch, stat leaders).
+
+### ⚾ baseball.html — controls
+| Mode | Keys |
+|------|------|
+| **Batting** | `← →` aim · `Space` swing · `Shift` power swing · `E` bunt |
+| **Pitching** | `← ↑ ↓ →` aim · `1` fastball `2` curve `3` slider `4` changeup · `Space` throw (`Shift` = max velocity) |
+
+You bat in the top of each inning and pitch in the bottom (vs CPU). Choose *Watch CPU vs CPU* to spectate. Runs in the current session only — no saving.
 
 ### 🎮 game.html — the playable game
 Open in a browser and use the keyboard:
