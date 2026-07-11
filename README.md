@@ -14,6 +14,8 @@ Two self-contained apps, each a **single HTML file** — no frameworks, no build
 
 You bat in the top of each inning and pitch in the bottom (vs CPU). Choose *Watch CPU vs CPU* to spectate. Runs in the current session only — no saving.
 
+There's also an **🎓 Academy**: three basic prospects (each with one maxed signature skill and one decent focus stat) that you can **train** to raise their ratings, then **add to any team's roster**.
+
 ### 🎮 game.html — the playable game
 Open in a browser and use the keyboard:
 

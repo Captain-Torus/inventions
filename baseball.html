@@ -85,6 +85,7 @@
         <button class="btn" data-go="playSetup">▶️ Exhibition Game</button>
         <button class="btn" data-go="tourSetup">🏆 Tournament Mode</button>
         <button class="btn sec" data-go="creator">🎨 Team Creator</button>
+        <button class="btn sec" data-go="academy">🎓 Academy (train players)</button>
         <button class="btn sec" data-go="settings">⚙️ Settings</button>
       </div>
       <p class="mini" style="text-align:center;margin-top:16px">
@@ -141,6 +142,15 @@
       <label>Game speed <span class="mini">(pitch & action pace)</span></label>
       <input id="setSpeed" type="range" min="0.5" max="1.4" step="0.05" value="0.85" style="width:220px">
       <p class="mini" style="margin-top:14px">You bat and pitch; fielding & base-running are handled automatically for you in this version. Everything runs in this session only — no saving.</p>
+    </div>
+  </section>
+
+  <!-- ACADEMY -->
+  <section id="academyScreen" class="screen">
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><h2>🎓 Academy</h2><button class="btn sec sm" data-go="menu">← Back</button></div>
+      <p class="mini">Three basic prospects, each good at a couple of things (their signature skill is already maxed). Train them to raise their ratings, then add them to any team's roster.</p>
+      <div id="acList" class="grid3" style="margin-top:10px"></div>
     </div>
   </section>
 
@@ -282,6 +292,27 @@ const PRESETS=[
   ['Mariners','#0c2c56','#005c5c',79],['Orioles','#df4601','#000000',80],['Guardians','#0c2340','#e31937',79],['Twins','#002b5c','#d31145',78]
 ];
 function presetTeams(n){return PRESETS.slice(0,n).map(([name,c1,c2,ov])=>new Team({name,c1,c2,players:makeRoster(ov)}));}
+// recompute a player's overall from the stats that matter for their role
+function recalcOverall(p){
+  const keys=p.isPitcher?['Pitch Velocity','Pitch Control','Curveball','Slider','Changeup']
+    :['Contact','Power','Speed','Fielding','Arm Strength'];
+  p.overall=clamp(Math.round(keys.reduce((s,k)=>s+p.g(k),0)/keys.length),1,99);
+}
+// three basic trainable prospects: signature maxed, one focus decent, the rest low
+function makeProspects(){
+  const mk=(name,pos,sig,focus,num)=>{
+    const p=new Player({name,pos,overall:52,signature:sig,number:num});
+    SIG.forEach(k=>{ if(k!==sig && !focus.includes(k)) p.stats[k]=clamp(p.stats[k]-6,15,66); });
+    focus.forEach(k=>{ if(k!==sig) p.stats[k]=clamp(Math.max(p.stats[k],60),1,78); });
+    recalcOverall(p);
+    return {player:p, focus, sessions:0, maxSessions:12};
+  };
+  return [
+    mk('Rookie Slugger','1B','Power',['Power','Contact'],44),
+    mk('Kid Speedster','CF','Speed',['Speed','Base Running'],7),
+    mk('Young Arm','P','Pitch Velocity',['Pitch Velocity','Pitch Control'],48),
+  ];
+}
 
 /* ============================== PHYSICS ============================= */
 const PhysicsEngine={
@@ -874,6 +905,7 @@ const Game={
   settings:{names:true}, renderer:null, input:null, pendingTie:null,
   init(){
     this.teams=presetTeams(16);
+    this.prospects=makeProspects();
     this.renderer=new Renderer($('#cv'));
     this.input=new InputHandler();
     this.input.onKey=k=>{ if(k==='escape'&&this.match)this.togglePause(); };
@@ -885,9 +917,10 @@ const Game={
   show(name){
     if(this.match && name!=='match'){ this.match=null; $('#gameScreen').classList.remove('active'); }
     $$('.screen').forEach(s=>s.classList.remove('active'));
-    const map={menu:'menuScreen',playSetup:'playSetupScreen',creator:'creatorScreen',settings:'settingsScreen',tourSetup:'tourSetupScreen',tour:'tourScreen'};
+    const map={menu:'menuScreen',playSetup:'playSetupScreen',creator:'creatorScreen',academy:'academyScreen',settings:'settingsScreen',tourSetup:'tourSetupScreen',tour:'tourScreen'};
     if(map[name])$('#'+map[name]).classList.add('active');
     if(name==='playSetup')this.fillPlay();
+    if(name==='academy')this.renderAcademy();
     if(name==='creator')this.renderCreator();
     if(name==='tourSetup')this.renderTourSetup();
     if(name==='tour')this.renderTournament();
@@ -922,6 +955,45 @@ const Game={
     $('#ccCount').textContent=this.teams.length;
     $('#ccTeams').innerHTML=this.teams.map((t,i)=>`<div class="teamchip"><span class="swatch" style="background:${t.c1}"></span><span class="swatch" style="background:${t.c2}"></span><b style="flex:1">${t.name}</b><span class="mini">${t.overall}</span>${i>=16?`<button class="btn danger sm" data-del="${i}">✕</button>`:''}</div>`).join('');
     $$('[data-del]',$('#ccTeams')).forEach(b=>b.onclick=()=>{this.teams.splice(+b.dataset.del,1);this.renderCreator();});
+  },
+  /* ---- academy: trainable prospects ---- */
+  renderAcademy(){
+    const el=$('#acList');
+    const teamOpts=this.teams.map((t,i)=>`<option value="${i}">${t.name}</option>`).join('');
+    el.innerHTML=this.prospects.map((pr,i)=>{
+      const p=pr.player, maxed=pr.sessions>=pr.maxSessions;
+      const bar=(k)=>{const v=p.g(k);return `<div style="margin:3px 0"><div class="mini">${k} — <b>${v}</b></div>
+        <div style="height:6px;background:#0a0f14;border-radius:4px;overflow:hidden"><div style="height:100%;width:${v}%;background:var(--accent)"></div></div></div>`;};
+      return `<div class="teamchip" style="display:block">
+        <div class="row" style="justify-content:space-between"><b>${p.name}</b><span class="pill">OVR ${p.overall}</span></div>
+        <div class="mini" style="margin:4px 0">${p.pos} · ⭐ ${p.signature} = 100</div>
+        ${pr.focus.map(bar).join('')}
+        <div class="mini" style="margin-top:6px">Training: ${'●'.repeat(pr.sessions)}${'○'.repeat(pr.maxSessions-pr.sessions)}</div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn sm" data-train="${i}" ${maxed?'disabled style="opacity:.5"':''}>🏋️ ${maxed?'Maxed':'Train'}</button>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <select data-team="${i}" style="flex:1">${teamOpts}</select>
+          <button class="btn sec sm" data-add="${i}">➕ Add</button>
+        </div>
+      </div>`;
+    }).join('');
+    $$('[data-train]',el).forEach(b=>b.onclick=()=>{this.trainProspect(+b.dataset.train);this.renderAcademy();});
+    $$('[data-add]',el).forEach(b=>b.onclick=()=>{const i=+b.dataset.add;const ti=+$(`[data-team="${i}"]`,el).value;this.addProspect(i,ti);});
+  },
+  trainProspect(i){
+    const pr=this.prospects[i]; if(pr.sessions>=pr.maxSessions)return;
+    pr.sessions++; const p=pr.player;
+    pr.focus.forEach(k=>{ if(k!==p.signature) p.stats[k]=clamp(p.stats[k]+irnd(2,4),1,98); });
+    const other=pick(SIG.filter(k=>k!==p.signature&&!pr.focus.includes(k)));
+    p.stats[other]=clamp(p.stats[other]+irnd(0,2),1,96);
+    recalcOverall(p);
+  },
+  addProspect(i,ti){
+    const src=this.prospects[i].player;
+    const clone=new Player({name:src.name,pos:src.pos,overall:src.overall,signature:src.signature,number:src.number,stats:{...src.stats}});
+    this.teams[ti].players.unshift(clone);   // unshift so a position player lands in the starting lineup
+    alert(`${src.name} (OVR ${src.overall}) added to ${this.teams[ti].name}.`);
   },
   /* ---- tournament setup ---- */
   renderTourSetup(){
